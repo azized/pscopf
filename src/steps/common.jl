@@ -122,9 +122,6 @@ function solve!(model::AbstractModel,
     else
         optimize!(model)
     end
-    println("rgap: ", relative_gap(model))
-    println("solvetime: ", solve_time(model))
-    println("status: ", termination_status(model))
 
     return model
 end
