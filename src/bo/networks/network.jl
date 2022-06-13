@@ -205,6 +205,10 @@ end
 ##        PTDF        ##
 ########################
 
+function get_cases(network::Network)
+    return keys(network.ptdf)
+end
+
 """
 # Arguments
     - `ptdf::PTDFDict` : PTDF data for different cases (N and N-1)

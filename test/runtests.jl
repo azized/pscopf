@@ -6,6 +6,8 @@ using PSCOPF
 
 include("test_wip//test_models/fixtures.jl")
 
+println("Testing with solver : ", PSCOPF.OPTIMIZER)
+
 #TODO : redirect logs
 @testset verbose=true "PSCOPF_TESTS" begin
     include("test_wip/test_modes.jl")

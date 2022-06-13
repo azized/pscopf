@@ -10,6 +10,7 @@ REF_SCHEDULE_TYPE_IN_TSO : Indicates which schedule to use as reference for pilo
                             for sequencing constraints and TSO objective function.
 """
 @with_kw mutable struct TSOBilevelConfigs
+    CONSIDER_N_1_CSTRS::Bool = false
     TSO_LIMIT_PENALTY::Float64 = 1e-3
     TSO_LOL_PENALTY::Float64 = 1e5
     TSO_CAPPING_COST::Float64 = 1.
@@ -303,13 +304,15 @@ function add_tso_constraints!(bimodel_container::TSOBilevelModel,
                             buses_ids_l, target_timepoints, scenarios,
                             cstr_prefix_name="tso_distribute_lol")
 
+    combinations = (configs.CONSIDER_N_1_CSTRS) ? all_combinations(network, target_timepoints, scenarios) :
+                                                    all_n_combinations(network, target_timepoints, scenarios)
     rso_constraints!(bimodel_container.model,
                     tso_model_container.flows,
                     tso_model_container.rso_constraint,
                     market_model_container.pilotable_model, #pilotable injections are decided by Market
                     tso_model_container.limitable_model, #limitable injections are decided by TSO
                     tso_model_container.lol_model,
-                    target_timepoints, scenarios,
+                    combinations,
                     uncertainties_at_ech, network,
                     prefix="tso")
 
@@ -887,8 +890,21 @@ function tso_bilevel(network::Networks.Network,
                         configs.TSO_LIMIT_PENALTY,
                         configs.TSO_PILOTABLE_BOUNDING_COST, configs.USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST)
 
-    solve!(bimodel_container_l, configs.problem_name, configs.out_path)
-    @info("Lower Objective Value : $(value(bimodel_container_l.lower.objective_model.full_obj))")
+    launch_solve!(bimodel_container_l, configs)
 
     return bimodel_container_l
+end
+
+function launch_solve!(bimodel_container::TSOBilevelModel, configs::TSOBilevelConfigs)
+    # first_iter = true
+    # while(!isempty(to_add) || first_iter)
+    #     first_iter = false
+    #     solve!(bimodel_container, configs.problem_name, configs.out_path)
+
+    #     to_add = verify_rso()
+    #     add_constraints(to_add)
+    # end
+
+    solve!(bimodel_container, configs.problem_name, configs.out_path)
+    @info("Lower Objective Value : $(value(bimodel_container.lower.objective_model.full_obj))")
 end
