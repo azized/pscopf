@@ -22,7 +22,7 @@ include(joinpath(root_path, "src", "PTDF.jl"));
 #########################
 
 input_path = ( length(ARGS) > 0 ? ARGS[1] :
-                    joinpath(@__DIR__, "..", "data", "ptdf") )
+                    joinpath(@__DIR__, "..", "data", "ptdf", "2buses") )
 output_path = joinpath(input_path, "pscopf_ptdf.txt")
 ref_bus_num = 1
 distributed = true

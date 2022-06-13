@@ -72,6 +72,24 @@ function read_buses!(network::Network, dir_path)
 end
 
 
+function cut_branch!(network::Network, i_branch_to_cut::Int)
+    cut_branch = pop!(network.branches, i_branch_to_cut)
+    @info("removed branch ", cut_branch.name, " from network!")
+    #no deletion in branch_to_i to keep the idx and to show the branch in the output but with zeros
+    #change branch_to_i ?
+    return cut_branch, network
+end
+
+function reduced_network(network::Network, i_branch_to_cut::Int)
+    # if a new CC is generated even the EOD constraint is no longer global,
+    #the two induced networks function independantly
+    @warn("TODO : verify that the network is still connected and no new CC was generated!")
+    network_l = deepcopy(network)
+
+    return cut_branch!(network_l, i_branch_to_cut)
+end
+
+
 
 function read_branches!(network::Network, dir_path)
     open(joinpath(dir_path, "branches.txt"), "r") do file
@@ -185,7 +203,7 @@ end
 
 function get_PTDF(network::Network, binv::Matrix, ref_bus::Int)
     n = length(network.bus_to_i);
-    m = length(network.branches);
+    m = length(network.branch_to_i);
     println("n ", n)
     println("m ", m)
     PTDF = zeros(Float64, m, n);
@@ -207,6 +225,7 @@ function get_PTDF(network::Network, binv::Matrix, ref_bus::Int)
             # end
         end
     end
+    println("PTDF=\n",PTDF)
     return PTDF
 end
 
@@ -255,13 +274,15 @@ end
 
 function write_PTDF(file_path::String,
                     network::Network, PTDF::Matrix,
-                    distributed=false, ref_bus::Int=-1;
+                    distributed=false, ref_bus::Int=-1,
+                    i_cut_branch::Union{Nothing,Int}=nothing;
                     PTDF_TRIMMER::Float64=1e-06,)
     n = length(network.bus_to_i);
-    m = length(network.branches);
+    m = length(network.branch_to_i);
     open(file_path, "w") do file
         ref_name =  distributed ? "\"distributed\"" : @sprintf("\"%s\"", network.buses[ref_bus].name)
-        write(file, @sprintf("#%20s %20s\n", "REF_BUS", ref_name))
+        cut_branch =  isnothing(i_cut_branch) ? "\"NONE\"" : @sprintf("\"%s\"", network.branches[i_cut_branch].name)
+        write(file, @sprintf("#%20s %20s %20s %20s\n", "REF_BUS", ref_name, "CUT_BRANCH", cut_branch))
         for branch_id in 1:m
             for bus_id in 1:n
                 branch_name =  @sprintf("\"%s\"", network.branches[branch_id].name)
