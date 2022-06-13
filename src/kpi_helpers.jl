@@ -43,7 +43,7 @@ function compute_flow(branch_id::String,
     flow = 0.
     for bus in Networks.get_buses(network)
         bus_id = Networks.get_id(bus)
-        ptdf = Networks.get_ptdf(network, branch_id, bus_id)
+        ptdf = Networks.safeget_ptdf_elt(network, branch_id, bus_id)
 
         load = get_uncertainties(uncertainties_at_ech, bus_id, ts, scenario)
         cut_load = get_loss_of_load(schedule, bus_id, ts, scenario)

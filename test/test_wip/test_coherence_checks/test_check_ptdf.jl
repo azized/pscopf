@@ -11,7 +11,7 @@ using DataStructures
     PSCOPF.add_new_branch!(network, "branch_1_3", 1000.)
 
     @testset "definition_example" begin
-        ptdf = SortedDict{String,SortedDict{String, Float64}}(
+        ptdf = PSCOPF.Networks.PTDFValues(
                         "branch_1_2" => SortedDict("bus_1"=>0.,
                                                     "bus_2"=>0.,
                                                     "bus_3"=>0.),

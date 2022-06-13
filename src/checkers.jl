@@ -27,8 +27,22 @@ end
 ####    PTDF
 ##################################
 
-function check_ptdf_branch_entries(ptdf::SortedDict{String,SortedDict{String, Float64}},
-                                    network::Network)
+function check_ptdf(ptdf::Networks.PTDFDict, network::Network)::Bool
+    checks = true
+    for (_, ptdf_values) in ptdf
+        checks &= check_ptdf(ptdf_values, network)
+    end
+    return checks
+end
+
+
+function check_ptdf(ptdf::Networks.PTDFValues, network::Network)::Bool
+    return ( check_ptdf_branch_entries(ptdf, network)
+            && check_ptdf_bus_entries(ptdf, network) )
+end
+
+
+function check_ptdf_branch_entries(ptdf::Networks.PTDFValues, network::Network)::Bool
     checks = true
 
     network_branch_ids = Set{String}(map(Networks.get_id, Networks.get_branches(network)))
@@ -50,8 +64,9 @@ function check_ptdf_branch_entries(ptdf::SortedDict{String,SortedDict{String, Fl
 
     return checks
 end
-function check_ptdf_bus_entries(ptdf::SortedDict{String,SortedDict{String, Float64}},
-                                network::Network)
+
+
+function check_ptdf_bus_entries(ptdf::Networks.PTDFValues, network::Network)::Bool
     checks = true
     network_bus_ids = Set{String}(map(Networks.get_id, Networks.get_buses(network)))
     for (branch_id, branch_ptdf) in ptdf
@@ -73,11 +88,6 @@ function check_ptdf_bus_entries(ptdf::SortedDict{String,SortedDict{String, Float
 
     end
     return checks
-end
-function check_ptdf(ptdf::SortedDict{String,SortedDict{String, Float64}},
-                    network::Network)
-    return ( check_ptdf_branch_entries(ptdf, network)
-            && check_ptdf_bus_entries(ptdf, network) )
 end
 
 ####    Generator

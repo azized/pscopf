@@ -1,5 +1,10 @@
 using DataStructures
 
+PTDFValues = SortedDict{String,SortedDict{String, Float64}}
+PTDFDict = SortedDict{String, PTDFValues}
+
+BASECASE = "BASECASE"
+
 struct Network
     name::String
     # Direct access containers
@@ -8,9 +13,9 @@ struct Network
 
     generators::SortedDict{String, Generator}
 
-    #Branch_id, Bus_id
-    ptdf::SortedDict{String,SortedDict{String, Float64}}
-    #FIXME : create ptdf structure to indicate reference bus
+    #FIXME : create ptdf structure ? to indicate reference bus, distributed or not, cut branches, original file...
+    # usecase => PTDF( Branch_id => Bus_id => value)
+    ptdf::PTDFDict
 
     # Constructor
     function Network(name::String)
@@ -200,27 +205,66 @@ end
 ##        PTDF        ##
 ########################
 
-function get_ptdf_component(network::Network, branch_id::String)
-    if haskey(network.ptdf,branch_id)
-        return network.ptdf[branch_id]
+"""
+# Arguments
+    - `ptdf::PTDFDict` : PTDF data for different cases (N and N-1)
+    - `case::String` : BASECASE for the basecase PTDF, name of the branch we cut in N-1 cases
+"""
+function safeget_ptdf(ptdf::PTDFDict, case::String=BASECASE)::PTDFValues
+    if haskey(ptdf,case)
+        return ptdf[case]
+    else
+        msg_l = @sprintf("Usecase %s is missing in PTDF data.", case)
+        error(msg_l)
+    end
+end
+
+function get_ptdf!(ptdf::PTDFDict, case::String=BASECASE)::PTDFValues
+    if !haskey(ptdf,case)
+        ptdf[case] = PTDFValues()
+    end
+    return ptdf[case]
+end
+
+
+function get_ptdf_component(ptdf_values::PTDFValues, branch_id::String)::Union{Missing,SortedDict{String, Float64}}
+    if haskey(ptdf_values,branch_id)
+        return ptdf_values[branch_id]
     else
         return missing
     end
 end
-
-function safeget_ptdf_component(network::Network, branch_id::String)
-    ptdf_component::Union{SortedDict{String, Float64}, Missing} = get_ptdf_component(network, branch_id)
-    if !isequal(ptdf_component, missing)
-        return ptdf_component
-    else
-        throw( error("PTDF value for branch ", branch_id, " does not exist in Network ", network.name) )
-    end
+function get_ptdf_component(ptdf::PTDFDict, branch_id::String, case::String=BASECASE)::Union{Missing,SortedDict{String, Float64}}
+    ptdf_values = safeget_ptdf(ptdf, case)
+    return get_ptdf_component(ptdf_values, branch_id)
+end
+function get_ptdf_component(network::Network, branch_id::String, case::String=BASECASE)::Union{Missing,SortedDict{String, Float64}}
+    ptdf_values = safeget_ptdf(network.ptdf, case)
+    return get_ptdf_component(ptdf_values, branch_id, case)
 end
 
-function get_ptdf(network::Network, branch_id::String, bus_id::String)
-    if haskey(network.ptdf,branch_id)
-        if haskey(network.ptdf[branch_id], bus_id)
-            return network.ptdf[branch_id][bus_id]
+
+function safeget_ptdf_component(ptdf_values::PTDFValues, branch_id::String)::Union{Missing,SortedDict{String, Float64}}
+    if haskey(ptdf_values,branch_id)
+        return ptdf_values[branch_id]
+    else
+        throw( error("PTDF value for branch ", branch_id, " does not exist in PTDF") )
+    end
+end
+function safeget_ptdf_component(ptdf::PTDFDict, branch_id::String, case::String=BASECASE)::Union{Missing,SortedDict{String, Float64}}
+    ptdf_values = safeget_ptdf(ptdf, case)
+    return safeget_ptdf_component(ptdf_values, branch_id)
+end
+function safeget_ptdf_component(network::Network, branch_id::String, case::String=BASECASE)::Union{Missing,SortedDict{String, Float64}}
+    ptdf_values = safeget_ptdf(network.ptdf, case)
+    return safeget_ptdf_component(ptdf_values, branch_id)
+end
+
+
+function get_ptdf_elt(ptdf_values::PTDFValues, branch_id::String, bus_id::String)::Union{Missing,Float64}
+    if haskey(ptdf_values,branch_id)
+        if haskey(ptdf_values[branch_id], bus_id)
+            return ptdf_values[branch_id][bus_id]
         else
             return missing
         end
@@ -228,20 +272,55 @@ function get_ptdf(network::Network, branch_id::String, bus_id::String)
         return missing
     end
 end
+function get_ptdf_elt(ptdf::PTDFDict, branch_id::String, bus_id::String, case::String=BASECASE)::Union{Missing,Float64}
+    ptdf_values = safeget_ptdf(ptdf, case)
+    return get_ptdf_elt(ptdf_values, branch_id, bus_id)
+end
+function get_ptdf_elt(network::Network, branch_id::String, bus_id::String, case::String=BASECASE)::Union{Missing,Float64}
+    ptdf_values = safeget_ptdf(network.ptdf, case)
+    return get_ptdf_elt(ptdf_values, branch_id, bus_id)
+end
 
-function safeget_ptdf(network::Network, branch_id::String, bus_id::String)
-    ptdf::Union{Float64, Missing} = get_ptdf(network, branch_id, bus_id)
-    if !isequal(ptdf, missing)
-        return ptdf
+
+function safeget_ptdf_elt(ptdf_values::PTDFValues, branch_id::String, bus_id::String)::Float64
+    if haskey(ptdf_values,branch_id)
+        if haskey(ptdf_values[branch_id], bus_id)
+            return ptdf_values[branch_id][bus_id]
+        else
+            throw( error("PTDF value for branch ", branch_id, " and bus ", bus_id, " does not exist.") )
+        end
     else
-        throw( error("PTDF value for branch ", branch_id, " and bus ", bus_id, " does not exist in Network ", network.name) )
+        throw( error("PTDF value for branch ", branch_id, " does not exist.") )
     end
 end
-
-function add_ptdf_elt!(network, branch_id::String, bus_id::String, ptdf_value::Float64)
-    ptdf_component = get!(network.ptdf, branch_id, SortedDict{String, Float64}())
-    ptdf_component[bus_id] = ptdf_value
+function safeget_ptdf_elt(ptdf::PTDFDict, branch_id::String, bus_id::String, case::String=BASECASE)::Float64
+    ptdf_values = safeget_ptdf(ptdf, case)
+    return safeget_ptdf_elt(ptdf_values, branch_id, bus_id)
 end
+function safeget_ptdf_elt(network::Network, branch_id::String, bus_id::String, case::String=BASECASE)::Float64
+    ptdf_values = safeget_ptdf(network.ptdf, case)
+    return safeget_ptdf_elt(ptdf_values, branch_id, bus_id)
+end
+
+
+function add_ptdf_elt!(ptdf_values::PTDFValues, branch_id::String, bus_id::String, ptdf_value::Float64)
+    ptdf_component = get!(ptdf_values, branch_id, SortedDict{String, Float64}())
+    if haskey(ptdf_component, bus_id)
+        msg_l = @sprintf("PTDF already contains value for branch %s and bus %s", branch_id, bus_id)
+        error(msg_l)
+    else
+        ptdf_component[bus_id] = ptdf_value
+    end
+end
+function add_ptdf_elt!(ptdf::PTDFDict, branch_id::String, bus_id::String, ptdf_value::Float64, case::String=BASECASE)::Float64
+    ptdf_values = get_ptdf!(ptdf, case)
+    return add_ptdf_elt!(ptdf_values, branch_id, bus_id, ptdf_value)
+end
+function add_ptdf_elt!(network::Network, branch_id::String, bus_id::String, ptdf_value::Float64, case::String=BASECASE)::Float64
+    ptdf_values = get_ptdf!(network.ptdf, case)
+    return add_ptdf_elt!(ptdf_values, branch_id, bus_id, ptdf_value)
+end
+
 
 ########################
 ##        utils       ##

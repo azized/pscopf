@@ -14,6 +14,7 @@ end
 export
     # struct
     Generator, Bus, Branch, Network,
+    PTDFDict, PTDFValues,
     # enum
     GeneratorType,
     # functions

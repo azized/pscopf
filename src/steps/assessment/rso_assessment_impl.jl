@@ -251,7 +251,7 @@ function create_flow_expressions(model_container::RSOAssessmentModel, network, T
             branch_flow_expr = AffExpr(0.)
             for bus in Networks.get_buses(network)
                 bus_id = Networks.get_id(bus)
-                ptdf = Networks.safeget_ptdf(network, branch_id, bus_id)
+                ptdf = Networks.safeget_ptdf_elt(network, branch_id, bus_id)
 
                 # + injections
                 for gen in Networks.get_generators(bus)
