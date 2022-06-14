@@ -163,15 +163,6 @@ function create_objectives!(model_container::TSOModel,
     return model_container
 end
 
-function bound_sum_p_deltas(model_container::TSOModel)
-    model_l = get_model(model_container)
-    deltas_expr = model_container.objective_model.deltas
-    value_sum_deltas = value(deltas_expr)
-
-    @constraint(model_l, deltas_expr<=value_sum_deltas)
-    return model_container
-end
-
 
 function tso_out_fo(network::Networks.Network,
                     target_timepoints::Vector{Dates.DateTime},
@@ -268,23 +259,7 @@ function tso_out_fo(network::Networks.Network,
                         configs.loss_of_load_penalty, configs.limitation_penalty)
 
 
-    launch_solve!(model_container_l, configs)
+    solve_2steps_deltas!(model_container_l, configs)
 
     return model_container_l
-end
-
-function launch_solve!(model_container::TSOModel, configs::TSOConfigs)
-    obj = model_container.objective_model.full_obj_1
-    @objective(get_model(model_container), Min, obj)
-    solve!(model_container, configs.problem_name*"_step1", configs.out_path)
-    @info "step2 objective current value : $(value(model_container.objective_model.full_obj_2))"
-
-    if (get_status(model_container)!=pscopf_INFEASIBLE
-        && value(model_container.objective_model.deltas)>0 )
-        bound_sum_p_deltas(model_container)
-
-        obj = model_container.objective_model.full_obj_2
-        @objective(get_model(model_container), Min, obj)
-        solve!(model_container, configs.problem_name*"_step2", configs.out_path)
-    end
 end

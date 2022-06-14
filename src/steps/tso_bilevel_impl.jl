@@ -10,6 +10,7 @@ REF_SCHEDULE_TYPE_IN_TSO : Indicates which schedule to use as reference for pilo
                             for sequencing constraints and TSO objective function.
 """
 @with_kw mutable struct TSOBilevelConfigs
+    CONSIDER_DELTAS::Bool = true
     CONSIDER_N_1_CSTRS::Bool = false
     TSO_LIMIT_PENALTY::Float64 = 1e-3
     TSO_LOL_PENALTY::Float64 = 1e5
@@ -68,12 +69,15 @@ end
 end
 
 @with_kw mutable struct TSOBilevelTSOObjectiveModel <: AbstractObjectiveModel
+    deltas = GenericAffExpr{Float64, VariableRef}()
+
     limitable_cost = GenericAffExpr{Float64, VariableRef}()
     pilotable_cost = GenericAffExpr{Float64, VariableRef}()
 
     penalty = GenericAffExpr{Float64, VariableRef}()
 
-    full_obj = GenericAffExpr{Float64, VariableRef}()
+    full_obj_1 = GenericAffExpr{Float64, VariableRef}()
+    full_obj_2 = GenericAffExpr{Float64, VariableRef}()
 end
 
 ##########################################################
@@ -213,8 +217,12 @@ function has_positive_slack(model_container::TSOBilevelModel)::Bool
     return has_positive_value(model_container.lower.lol_model.p_global_loss_of_load) #If TSO cut => market did too
 end
 
+function has_positive_slack(model_container::TSOBilevelTSOModelContainer)::Bool
+    return has_positive_value(model_container.lol_model.p_loss_of_load) #If market cut => TSO localised the LoL
+end
+
 function get_upper_obj_expr(bilevel_model::TSOBilevelModel)
-    return bilevel_model.upper.objective_model.full_obj
+    return bilevel_model.upper.objective_model.full_obj_2
 end
 function get_lower_obj_expr(bilevel_model::TSOBilevelModel)
     return bilevel_model.lower.objective_model.full_obj
@@ -344,7 +352,16 @@ function create_tso_objectives!(bimodel_container::TSOBilevelModel,
                                 pilotable_bounding_cost,
                                 use_prop_cost_for_bounding::Bool)
     tso_model_container = bimodel_container.upper
+    market_model_container = bimodel_container.lower
     objective_model = tso_model_container.objective_model
+
+    # cost for deviating from market schedule
+    for (_, var_delta) in market_model_container.pilotable_model.delta_p
+        objective_model.deltas += var_delta
+    end
+    for (_, var_delta) in tso_model_container.limitable_model.delta_p
+        objective_model.deltas += var_delta
+    end
 
     # objective_model.pilotable_cost
     add_tsobilevel_impositions_cost!(tso_model_container,
@@ -361,12 +378,15 @@ function create_tso_objectives!(bimodel_container::TSOBilevelModel,
     objective_model.penalty += coeffxsum(tso_model_container.limitable_model.b_is_limited, limit_penalty)
 
     # cost for cutting load/consumption by the market
-    objective_model.penalty += coeffxsum(bimodel_container.lower.lol_model.p_global_loss_of_load, loss_of_load_cost)
+    objective_model.penalty += coeffxsum(market_model_container.lol_model.p_global_loss_of_load, loss_of_load_cost)
 
-    objective_model.full_obj = ( objective_model.pilotable_cost +
+    #Objective 1 : add penalty ?
+    objective_model.full_obj_1 = objective_model.deltas + objective_model.penalty
+    #Objective 2 : add penalty ?
+    objective_model.full_obj_2 = ( objective_model.pilotable_cost +
                                 objective_model.limitable_cost +
                                 objective_model.penalty )
-    @objective(tso_model_container.model, Min, objective_model.full_obj)
+
     return tso_model_container
 end
 
@@ -931,6 +951,13 @@ function launch_solve!(bimodel_container::TSOBilevelModel, configs::TSOBilevelCo
     #     add_constraints(to_add)
     # end
 
-    solve!(bimodel_container, configs.problem_name, configs.out_path)
+    #the upper problem's objective model holds the two objective expressions and the deltas expression
+    if configs.CONSIDER_DELTAS
+        solve_2steps_deltas!(bimodel_container.upper, configs)
+    else
+        obj = bimodel_container.upper.objective_model.full_obj_2
+        @objective(get_model(bimodel_container), Min, obj)
+        solve!(bimodel_container, configs.problem_name, configs.out_path)
+    end
     @info("Lower Objective Value : $(value(bimodel_container.lower.objective_model.full_obj))")
 end

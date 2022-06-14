@@ -98,6 +98,33 @@ function get_status(model_container_p::AbstractModelContainer)::PSCOPFStatus
     end
 end
 
+function solve_2steps_deltas!(model_container::AbstractModelContainer, configs)
+    obj = model_container.objective_model.full_obj_1
+    @objective(get_model(model_container), Min, obj)
+    solve!(model_container, configs.problem_name*"_step1", configs.out_path)
+    @info "step2 objective current value : $(value(model_container.objective_model.full_obj_2))"
+
+    if (get_status(model_container)!=pscopf_INFEASIBLE
+        && value(model_container.objective_model.deltas)>0 )
+        bound_sum_p_deltas(model_container)
+
+        obj = model_container.objective_model.full_obj_2
+        @objective(get_model(model_container), Min, obj)
+        solve!(model_container, configs.problem_name*"_step2", configs.out_path)
+        @info "step 1 objective current value (deltas) : $(value(model_container.objective_model.full_obj_1))"
+    end
+end
+
+function bound_sum_p_deltas(model_container::AbstractModelContainer)
+    model_l = get_model(model_container)
+    deltas_expr = model_container.objective_model.deltas
+    value_sum_deltas = value(deltas_expr)
+
+    @constraint(model_l, deltas_expr<=value_sum_deltas)
+    return model_container
+end
+
+
 function solve!(model::AbstractModel,
                 problem_name="problem", out_folder=nothing,
                 optimizer=OPTIMIZER)
