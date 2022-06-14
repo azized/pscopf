@@ -23,9 +23,9 @@ end
 
 @with_kw struct TSOLimitableModel <: AbstractLimitableModel
     #gen,ts,s
-    p_injected = SortedDict{Tuple{String,DateTime,String},VariableRef}();
-    #gen,ts,s
     delta_p = SortedDict{Tuple{String,DateTime,String},VariableRef}();
+    #gen,ts,s
+    p_injected = SortedDict{Tuple{String,DateTime,String},VariableRef}();
     #gen,ts,s
     p_limit = SortedDict{Tuple{String,DateTime,String},VariableRef}();
     #gen,ts,s
@@ -36,9 +36,9 @@ end
 
 @with_kw struct TSOPilotableModel <: AbstractPilotableModel
     #gen,ts,s
-    p_injected = SortedDict{Tuple{String,DateTime,String},VariableRef}();
-    #gen,ts,s
     delta_p = SortedDict{Tuple{String,DateTime,String},VariableRef}();
+    #gen,ts,s
+    p_injected = SortedDict{Tuple{String,DateTime,String},VariableRef}();
     #gen,ts,s
     b_start = SortedDict{Tuple{String,DateTime,String},VariableRef}();
     #gen,ts,s

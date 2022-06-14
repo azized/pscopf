@@ -34,6 +34,8 @@ end
 
 @with_kw struct TSOBilevelTSOLimitableModel <: AbstractLimitableModel
     #gen,ts,s
+    delta_p = SortedDict{Tuple{String,DateTime,String},VariableRef}();
+    #gen,ts,s
     p_injected = SortedDict{Tuple{String,DateTime,String},VariableRef}();
     #gen,ts,s
     p_limit = SortedDict{Tuple{String,DateTime,String},VariableRef}();
@@ -84,7 +86,16 @@ end
     p_global_capping = SortedDict{Tuple{DateTime,String},VariableRef}();
 end
 
+"""
+# Note :
+    deltas are added here to allow automatically computing them and their constraints
+    but the constraints are not included in the reformulation (stationarity nor complementarity)
+    cause they can be seen as part of the upper
+    constraints discussed here are : delta >= +- (p_injected - P_ref)
+"""
 @with_kw struct TSOBilevelMarketPilotableModel <: AbstractPilotableModel
+    #gen,ts,s
+    delta_p = SortedDict{Tuple{String,DateTime,String},VariableRef}();
     #gen,ts,s
     p_injected = SortedDict{Tuple{String,DateTime,String},VariableRef}();
 end
@@ -216,7 +227,8 @@ end
 function create_tso_vars!( model_container::TSOBilevelTSOModelContainer,
                             network::Networks.Network,
                             target_timepoints::Vector{Dates.DateTime},
-                            scenarios::Vector{String}
+                            scenarios::Vector{String},
+                            preceding_market_schedule::Schedule
                             )
     pilotables_list_l = Networks.get_generators_of_type(network, Networks.PILOTABLE)
     limitables_list_l = Networks.get_generators_of_type(network, Networks.LIMITABLE)
@@ -228,6 +240,8 @@ function create_tso_vars!( model_container::TSOBilevelTSOModelContainer,
     add_limitables_vars!(model_container,
                         target_timepoints, scenarios,
                         limitables_list_l,
+                        preceding_market_schedule,
+                        delta_vars=true,
                         injection_vars=true, limit_vars=true, local_capping_vars=true, global_capping_vars=true,
                         prefix="tso"
                         )
@@ -436,12 +450,15 @@ end
 function create_market_vars!(model_container::TSOBilevelMarketModelContainer,
                             network::Networks.Network,
                             target_timepoints::Vector{Dates.DateTime},
-                            scenarios::Vector{String}
+                            scenarios::Vector{String},
+                            preceding_market_schedule::Schedule
                             )
 
     pilotables_list_l = Networks.get_generators_of_type(network, Networks.PILOTABLE)
     add_pilotables_vars!(model_container,
                         pilotables_list_l, target_timepoints, scenarios,
+                        preceding_market_schedule,
+                        delta_vars=true,
                         injection_vars=true,
                         prefix="market_"
                         )
@@ -870,9 +887,11 @@ function tso_bilevel(network::Networks.Network,
     bimodel_container_l = TSOBilevelModel()
 
     create_tso_vars!(bimodel_container_l.upper,
-                    network, target_timepoints, scenarios)
+                    network, target_timepoints, scenarios,
+                    preceding_market_schedule)
     create_market_vars!(bimodel_container_l.lower,
-                        network, target_timepoints, scenarios)
+                        network, target_timepoints, scenarios,
+                        preceding_market_schedule)
 
     #this is the expression no objective is added to the jump model
     create_market_objectives!(bimodel_container_l.lower, network,
