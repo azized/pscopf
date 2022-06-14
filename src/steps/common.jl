@@ -1107,57 +1107,27 @@ function eod_constraints!(model::AbstractModel, eod_constraints::SortedDict{Tupl
     end
 end
 
-function all_n_combinations(network, target_timepoints, scenarios)
-    return [(branch_id,ts,s,Networks.BASECASE)
-                for branch_id in map(Networks.get_id, Networks.get_branches(network))
-                for ts in target_timepoints
-                for s in scenarios
-            ]
-end
-function all_combinations(network, target_timepoints, scenarios)
-    return [(branch_id,ts,s,case)
-                for branch_id in map(Networks.get_id, Networks.get_branches(network))
-                for ts in target_timepoints
-                for s in scenarios
-                for case in Networks.get_cases(network) #if the network does not hold the PTDF data for a case it will be ignored
-            ]
-end
-
-function rso_constraints!(model::AbstractModel,
-                          flows::SortedDict{Tuple{String,Dates.DateTime,String}, VariableRef},
-                          rso_constraints::SortedDict{Tuple{String,Dates.DateTime,String}, ConstraintRef},
-                        pilotable_model::AbstractPilotableModel,
-                        limitable_model::AbstractLimitableModel,
-                        lol_model::AbstractLoLModel,
-                        combinations_to_consider, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
-                        uncertainties_at_ech, network::Networks.Network;
-                        prefix::String="")
-    for (branch_id,ts,s,ptdf_case) in combinations_to_consider
+function add_rso_flows_exprs(flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
+                pilotable_model::AbstractPilotableModel,
+                limitable_model::AbstractLimitableModel,
+                lol_model::AbstractLoLModel,
+                combinations_to_consider, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
+                uncertainties_at_ech, network::Networks.Network)
+    for (branch_id, ts, s, ptdf_case) in combinations_to_consider
         branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
-        rso_constraint!(model, flows, rso_constraints,
+        add_rso_flow_expr!(flows,
                         pilotable_model, limitable_model, lol_model,
                         branch, ts, s, ptdf_case,
-                        uncertainties_at_ech, network,
-                        prefix=prefix)
+                        uncertainties_at_ech, network)
     end
 end
-
-function rso_constraint!(model::AbstractModel,
-                          flows::SortedDict{Tuple{String,Dates.DateTime,String}, VariableRef},
-                          rso_constraints::SortedDict{Tuple{String,Dates.DateTime,String}, ConstraintRef},
-                        pilotable_model::AbstractPilotableModel,
-                        limitable_model::AbstractLimitableModel,
-                        lol_model::AbstractLoLModel,
-                        branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
-                        uncertainties_at_ech, network::Networks.Network;
-                        prefix::String="")
-
+function add_rso_flow_expr!(flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
+                    pilotable_model::AbstractPilotableModel,
+                    limitable_model::AbstractLimitableModel,
+                    lol_model::AbstractLoLModel,
+                    branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
+                    uncertainties_at_ech, network::Networks.Network)
     branch_id = Networks.get_id(branch)
-    flow_limit_l = Networks.get_limit(branch)
-
-    name =  @sprintf("%sFlow[%s,%s,%s]", prefix, branch_id, ts, s)
-    flows[branch_id, ts, s] =
-        @variable(model, base_name=name, lower_bound=-flow_limit_l, upper_bound=flow_limit_l)
 
     flow_l = AffExpr()
     for bus in Networks.get_buses(network)
@@ -1184,10 +1154,60 @@ function rso_constraint!(model::AbstractModel,
         # + cutting loads ~ injections
         flow_l += ptdf * get_local_lol(lol_model)[bus_id, ts, s]
     end
-    c_name =  @sprintf("%sRSO[%s,%s,%s]", prefix, branch_id, ts, s)
-    rso_constraints[branch_id, ts, s] = @constraint(model, flows[branch_id, ts, s] == flow_l, base_name=c_name)
+
+    flows[branch_id, ts, s, ptdf_case] = flow_l
+    return flow_l
+end
+
+function rso_constraints!(model::AbstractModel,
+                          rso_constraints::SortedDict{Tuple{String,Dates.DateTime,String,String}, ConstraintRef},
+                        flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
+                        combinations_to_consider, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
+                        network::Networks.Network;
+                        prefix::String="")
+    for (branch_id, ts, s, ptdf_case) in combinations_to_consider
+        branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
+        rso_constraint!(model, rso_constraints,
+                        flows,
+                        branch, ts, s, ptdf_case,
+                        prefix=prefix)
+    end
+end
+function rso_constraint!(model::AbstractModel,
+                         rso_constraints::SortedDict{Tuple{String,Dates.DateTime,String,String}, ConstraintRef},
+                        flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
+                        branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String;
+                        prefix::String="")
+
+    branch_id = Networks.get_id(branch)
+    flow_limit_l = Networks.get_limit(branch)
+
+    c_name =  @sprintf("%sRSO[%s,%s,%s,%s]", prefix, branch_id, ts, s, ptdf_case)
+    flow_l = flows[branch_id, ts, s, ptdf_case]
+    rso_constraints[branch_id, ts, s, ptdf_case] = @constraint(model, -flow_limit_l <= flow_l <= flow_limit_l, base_name=c_name)
 
 end
+
+# Helpers
+##################
+
+function all_n_combinations(network, target_timepoints, scenarios)
+    return [(branch_id,ts,s,Networks.BASECASE)
+                for branch_id in map(Networks.get_id, Networks.get_branches(network))
+                for ts in target_timepoints
+                for s in scenarios
+            ]
+end
+
+function all_combinations(network, target_timepoints, scenarios)
+    return [(branch_id,ts,s,case)
+                for branch_id in map(Networks.get_id, Networks.get_branches(network))
+                for ts in target_timepoints
+                for s in scenarios
+                for case in Networks.get_cases(network) #if the network does not hold the PTDF data for a case it will be ignored
+            ]
+end
+
 
 # Utils
 ##################

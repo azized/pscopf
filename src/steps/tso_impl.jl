@@ -72,11 +72,11 @@ end
     #ts,s
     eod_constraint::SortedDict{Tuple{Dates.DateTime,String}, ConstraintRef} =
         SortedDict{Tuple{Dates.DateTime,String}, ConstraintRef}()
-    #branch,ts,s
-    flows::SortedDict{Tuple{String,DateTime,String},VariableRef} =
-        SortedDict{Tuple{String,DateTime,String},VariableRef}()
-    rso_constraint::SortedDict{Tuple{String,DateTime,String},ConstraintRef} =
-        SortedDict{Tuple{String,DateTime,String},ConstraintRef}()
+    #branch,ts,s,ptdf_case
+    flows::SortedDict{Tuple{String,DateTime,String,String},AffExpr} =
+        SortedDict{Tuple{String,DateTime,String,String},AffExpr}()
+    rso_constraint::SortedDict{Tuple{String,DateTime,String,String},ConstraintRef} =
+        SortedDict{Tuple{String,DateTime,String,String},ConstraintRef}()
 end
 
 function has_positive_slack(model_container::TSOModel)::Bool
@@ -247,14 +247,20 @@ function tso_out_fo(network::Networks.Network,
                     )
 
     # RSO
+    add_rso_flows_exprs(model_container_l.flows,
+                model_container_l.pilotable_model,
+                model_container_l.limitable_model,
+                model_container_l.lol_model,
+                all_combinations(network, target_timepoints, scenarios),
+                uncertainties_at_ech, network)
     combinations = (configs.CONSIDER_N_1_CSTRS) ? all_combinations(network, target_timepoints, scenarios) :
                                                     all_n_combinations(network, target_timepoints, scenarios)
-    rso_constraints!(model_container_l.model, model_container_l.flows, model_container_l.rso_constraint,
-                    model_container_l.pilotable_model,
-                    model_container_l.limitable_model,
-                    model_container_l.lol_model,
+    rso_constraints!(model_container_l.model,
+                    model_container_l.rso_constraint,
+                    model_container_l.flows,
                     combinations,
-                    uncertainties_at_ech, network)
+                    network,
+                    prefix="tso")
 
     create_objectives!(model_container_l,
                         network, uncertainties_at_ech,

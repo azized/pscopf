@@ -113,11 +113,11 @@ end
     pilotable_model::TSOBilevelTSOPilotableModel = TSOBilevelTSOPilotableModel()
     lol_model::TSOBilevelTSOLoLModel = TSOBilevelTSOLoLModel()
     objective_model::TSOBilevelTSOObjectiveModel = TSOBilevelTSOObjectiveModel()
-    #branch,ts,s
-    flows::SortedDict{Tuple{String,DateTime,String},VariableRef} =
-        SortedDict{Tuple{String,DateTime,String},VariableRef}()
-    rso_constraint::SortedDict{Tuple{String,DateTime,String},ConstraintRef} =
-        SortedDict{Tuple{String,DateTime,String},ConstraintRef}()
+    #branch,ts,s,ptdf_case
+    flows::SortedDict{Tuple{String,DateTime,String,String},AffExpr} =
+        SortedDict{Tuple{String,DateTime,String,String},AffExpr}()
+    rso_constraint::SortedDict{Tuple{String,DateTime,String,String},ConstraintRef} =
+        SortedDict{Tuple{String,DateTime,String,String},ConstraintRef}()
 end
 @with_kw struct TSOBilevelMarketModelContainer <: AbstractModelContainer
     model::Model
@@ -304,16 +304,19 @@ function add_tso_constraints!(bimodel_container::TSOBilevelModel,
                             buses_ids_l, target_timepoints, scenarios,
                             cstr_prefix_name="tso_distribute_lol")
 
+    add_rso_flows_exprs(tso_model_container.flows,
+                market_model_container.pilotable_model,
+                tso_model_container.limitable_model,
+                tso_model_container.lol_model,
+                all_combinations(network, target_timepoints, scenarios),
+                uncertainties_at_ech, network)
     combinations = (configs.CONSIDER_N_1_CSTRS) ? all_combinations(network, target_timepoints, scenarios) :
                                                     all_n_combinations(network, target_timepoints, scenarios)
     rso_constraints!(bimodel_container.model,
-                    tso_model_container.flows,
                     tso_model_container.rso_constraint,
-                    market_model_container.pilotable_model, #pilotable injections are decided by Market
-                    tso_model_container.limitable_model, #limitable injections are decided by TSO
-                    tso_model_container.lol_model,
+                    tso_model_container.flows,
                     combinations,
-                    uncertainties_at_ech, network,
+                    network,
                     prefix="tso")
 
     return bimodel_container
