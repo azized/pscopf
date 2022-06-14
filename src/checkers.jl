@@ -28,7 +28,7 @@ end
 ##################################
 
 function check_ptdf(ptdf::Networks.PTDFDict, network::Network)::Bool
-    checks = true
+    checks = check_ptdf_case_entries(ptdf, network)
     for (_, ptdf_values) in ptdf
         checks &= check_ptdf(ptdf_values, network)
     end
@@ -88,6 +88,34 @@ function check_ptdf_bus_entries(ptdf::Networks.PTDFValues, network::Network)::Bo
 
     end
     return checks
+end
+
+"""
+    Prints error messages but always returns true.
+"""
+function check_ptdf_case_entries(ptdf::Networks.PTDFDict, network::Network)::Bool
+    checks = true
+
+    required_cases = Set{String}(map(Networks.get_id, Networks.get_branches(network)))
+    push!(required_cases, Networks.BASECASE)
+    ptdf_cases = Set{String}(keys(ptdf))
+
+    missing_entries = setdiff(required_cases, ptdf_cases)
+    if !isempty(missing_entries)
+        checks = false
+        msg = @sprintf("Missing case entries `%s` in ptdf", missing_entries)
+        @error(msg)
+    end
+
+    extra_entries = setdiff(ptdf_cases, required_cases)
+    if !isempty(extra_entries)
+        checks = false
+        msg = @sprintf("Extra case entries `%s` in ptdf", extra_entries)
+        @error(msg)
+    end
+
+    # return checks
+    return true
 end
 
 ####    Generator
