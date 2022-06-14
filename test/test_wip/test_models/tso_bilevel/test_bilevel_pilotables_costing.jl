@@ -64,13 +64,13 @@ using Printf
         => TSO will impose one of the two preceding conditions, the cheaper one => option 2
 
     =#
-    @testset "default_cost" begin
+    @testset "configured_same_cost" begin
 
         context = create_instance(10., 100.,
                                 10., 50.,
                                 35.)
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)

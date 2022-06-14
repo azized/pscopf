@@ -107,7 +107,7 @@ using Printf
                                     PSCOPF.ON, PSCOPF.ON,
                                     35.,"start_imp_test")
 
-            tso = PSCOPF.TSOBilevel()
+            tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
             firmness = PSCOPF.compute_firmness(tso,
                                                 ech, next_ech,
                                                 TS, context)
@@ -188,7 +188,7 @@ using Printf
                                     PSCOPF.OFF, PSCOPF.OFF,
                                     35.,"start_imp_test")
 
-            tso = PSCOPF.TSOBilevel()
+            tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=true))
             firmness = PSCOPF.compute_firmness(tso,
                                                 ech, next_ech,
                                                 TS, context)
@@ -197,8 +197,7 @@ using Printf
                         context)
 
             # Solution status
-            @test_broken PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-            @test PSCOPF.get_status(result) == PSCOPF.pscopf_HAS_SLACK
+            @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
 
             #TSO RSO constraints are OK
             @test value(result.upper.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
@@ -206,28 +205,22 @@ using Printf
 
             #Market
             @test value(result.lower.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
-            @test_broken value(result.lower.lol_model.p_global_loss_of_load[TS[1],"S1"]) < 1e-09
-            @test 60 ≈ value(result.lower.lol_model.p_global_loss_of_load[TS[1],"S1"])
+            @test value(result.lower.lol_model.p_global_loss_of_load[TS[1],"S1"]) < 1e-09
 
             #TSO impositions
             #prod_1_1
-            @test_broken 20. ≈ value(result.upper.pilotable_model.p_imposition_min["prod_1_1",TS[1],"S1"])
-            @test_broken 200. ≈ value(result.upper.pilotable_model.p_imposition_max["prod_1_1",TS[1],"S1"])
-            @test value(result.upper.pilotable_model.p_imposition_min["prod_1_1",TS[1],"S1"]) < 1e-09
-            @test value(result.upper.pilotable_model.p_imposition_max["prod_1_1",TS[1],"S1"]) < 1e-09
+            @test 20. ≈ value(result.upper.pilotable_model.p_imposition_min["prod_1_1",TS[1],"S1"])
+            @test 200. ≈ value(result.upper.pilotable_model.p_imposition_max["prod_1_1",TS[1],"S1"])
             #prod_2_1
             @test value(result.upper.pilotable_model.p_imposition_min["prod_2_1",TS[1],"S1"]) < 1e-09
             @test value(result.upper.pilotable_model.p_imposition_max["prod_2_1",TS[1],"S1"]) < 1e-09
 
             #Market chooses the levels respecting the bounds for pilotable production
-            @test_broken 60. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
+            @test 60. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
             @test value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"]) < 1e-09
-            @test value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"]) < 1e-09
 
-            @test_broken value(PSCOPF.get_upper_obj_expr(result)) ≈ 20.
-            @test_broken value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * 10.)
-            @test value(PSCOPF.get_upper_obj_expr(result))  < 1e-09
-            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ 60. *tso.configs.MARKET_LOL_PENALTY
+            @test value(PSCOPF.get_upper_obj_expr(result)) ≈ 20. * 10. #imposition cost of prod_1_1
+            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * 10.)
 
         end
 
@@ -272,7 +265,7 @@ using Printf
                                     missing, missing,
                                     35.,"start_imp_test")
 
-            tso = PSCOPF.TSOBilevel()
+            tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=true))
             firmness = PSCOPF.compute_firmness(tso,
                                                 ech, next_ech,
                                                 TS, context)
@@ -281,8 +274,7 @@ using Printf
                         context)
 
             # Solution status
-            @test_broken PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-            @test PSCOPF.get_status(result) == PSCOPF.pscopf_HAS_SLACK
+            @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
 
             #TSO RSO constraints are OK
             @test value(result.upper.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
@@ -290,28 +282,22 @@ using Printf
 
             #Market
             @test value(result.lower.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
-            @test_broken value(result.lower.lol_model.p_global_loss_of_load[TS[1],"S1"]) < 1e-09
-            @test 60 ≈ value(result.lower.lol_model.p_global_loss_of_load[TS[1],"S1"])
+            @test value(result.lower.lol_model.p_global_loss_of_load[TS[1],"S1"]) < 1e-09
 
             #TSO impositions
             #prod_1_1
-            @test_broken 20. ≈ value(result.upper.pilotable_model.p_imposition_min["prod_1_1",TS[1],"S1"])
-            @test_broken 200. ≈ value(result.upper.pilotable_model.p_imposition_max["prod_1_1",TS[1],"S1"])
-            @test value(result.upper.pilotable_model.p_imposition_min["prod_1_1",TS[1],"S1"]) < 1e-09
-            @test value(result.upper.pilotable_model.p_imposition_max["prod_1_1",TS[1],"S1"]) < 1e-09
+            @test 20. ≈ value(result.upper.pilotable_model.p_imposition_min["prod_1_1",TS[1],"S1"])
+            @test 200. ≈ value(result.upper.pilotable_model.p_imposition_max["prod_1_1",TS[1],"S1"])
             #prod_2_1
             @test value(result.upper.pilotable_model.p_imposition_min["prod_2_1",TS[1],"S1"]) < 1e-09
             @test value(result.upper.pilotable_model.p_imposition_max["prod_2_1",TS[1],"S1"]) < 1e-09
 
             #Market chooses the levels respecting the bounds for pilotable production
-            @test_broken 60. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
+            @test 60. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
             @test value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"]) < 1e-09
-            @test value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"]) < 1e-09
 
-            @test_broken value(PSCOPF.get_upper_obj_expr(result)) ≈ 20.
-            @test_broken value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * 10.)
-            @test value(PSCOPF.get_upper_obj_expr(result))  < 1e-09
-            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ 60. *tso.configs.MARKET_LOL_PENALTY
+            @test value(PSCOPF.get_upper_obj_expr(result)) ≈ 20. *10. #imposition of prod_1_1
+            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * 10.)
 
         end
 
@@ -348,7 +334,7 @@ using Printf
                                     PSCOPF.ON, PSCOPF.OFF,
                                     35.,"start_imp_test")
 
-            tso = PSCOPF.TSOBilevel()
+            tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
             firmness = PSCOPF.compute_firmness(tso,
                                                 ech, next_ech,
                                                 TS, context)
@@ -414,7 +400,7 @@ using Printf
                                     PSCOPF.OFF, PSCOPF.ON,
                                     35.,"start_imp_test")
 
-            tso = PSCOPF.TSOBilevel()
+            tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
             firmness = PSCOPF.compute_firmness(tso,
                                                 ech, next_ech,
                                                 TS, context)
@@ -492,7 +478,7 @@ using Printf
                                 PSCOPF.ON, PSCOPF.OFF,
                                 35.,"pilotable_test")
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)
@@ -565,7 +551,7 @@ using Printf
                                 PSCOPF.ON, PSCOPF.ON,
                                 35.,"pilotable_test")
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)
@@ -600,7 +586,9 @@ using Printf
         @test 45. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
         @test 200. ≈ value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"])
 
-        @test 155. ≈ objective_value(result.upper.model)
+        @test objective_value(result.upper.model) ≈ ( 155.
+                                                        + 65. *tso.configs.TSO_LOL_PENALTY #market LoL
+                                                    )
 
     end
 
@@ -629,7 +617,7 @@ using Printf
                                 PSCOPF.ON, PSCOPF.ON,
                                 500.)
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)

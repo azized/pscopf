@@ -305,7 +305,7 @@ using Printf
         #costs
         @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (
                     0. #S1
-                    + 15*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY #S2
+                    + 15*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY + 15*tso.configs.TSO_LOL_PENALTY#S2
                     )
         @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (
                     0. #S1
@@ -366,7 +366,7 @@ using Printf
         #costs
         @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (
                     0. #S1 (no limitation)
-                    + 15*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY #S2
+                    + 15*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY + 15*tso.configs.TSO_LOL_PENALTY #S2
                     )
         @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (
                     0. #S1
@@ -485,7 +485,7 @@ using Printf
         #costs
         @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (
                     0. #S1 (no limitation)
-                    + 20*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY #S2
+                    + 20*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY + 20*tso.configs.TSO_LOL_PENALTY #S2
                     )
         @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (
                     0. #S1
@@ -575,8 +575,8 @@ using Printf
 
         #costs
         @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (
-                    15*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY #S1
-                    + 20*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY #S2
+                    15*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY + 15*tso.configs.TSO_LOL_PENALTY #S1
+                    + 20*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY + 20*tso.configs.TSO_LOL_PENALTY #S2
                     )
         @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (
                     15*tso.configs.MARKET_CAPPING_COST + 15*tso.configs.MARKET_LOL_PENALTY #S1

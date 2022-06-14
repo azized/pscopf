@@ -15,7 +15,7 @@ REF_SCHEDULE_TYPE_IN_TSO : Indicates which schedule to use as reference for pilo
     TSO_LOL_PENALTY::Float64 = 1e5
     TSO_CAPPING_COST::Float64 = 1.
     TSO_PILOTABLE_BOUNDING_COST::Float64 = 1.
-    USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST::Bool = false
+    USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST::Bool = true
     MARKET_LOL_PENALTY::Float64 = 1e5
     MARKET_CAPPING_COST::Float64 = 1.
     out_path::Union{Nothing,String} = nothing
@@ -322,34 +322,38 @@ function add_tso_constraints!(bimodel_container::TSOBilevelModel,
     return bimodel_container
 end
 
-function create_tso_objectives!(model_container::TSOBilevelTSOModelContainer,
+function create_tso_objectives!(bimodel_container::TSOBilevelModel,
                                 target_timepoints, scenarios, network,
                                 preceding_market_schedule::Schedule,
                                 capping_cost, loss_of_load_cost,
                                 limit_penalty,
                                 pilotable_bounding_cost,
                                 use_prop_cost_for_bounding::Bool)
-    objective_model = model_container.objective_model
+    tso_model_container = bimodel_container.upper
+    objective_model = tso_model_container.objective_model
 
     # objective_model.pilotable_cost
-    add_tsobilevel_impositions_cost!(model_container,
+    add_tsobilevel_impositions_cost!(tso_model_container,
                                     target_timepoints, scenarios, network,
                                     preceding_market_schedule,
                                     pilotable_bounding_cost,
                                     use_prop_cost_for_bounding)
 
     # limitable_cost : capping (fr. ecretement)
-    objective_model.limitable_cost += coeffxsum(model_container.limitable_model.p_global_capping, capping_cost)
+    objective_model.limitable_cost += coeffxsum(tso_model_container.limitable_model.p_global_capping, capping_cost)
 
     # cost for cutting consumption (lol) and avoid limiting for no reason
-    objective_model.penalty += coeffxsum(model_container.lol_model.p_global_loss_of_load, loss_of_load_cost)
-    objective_model.penalty += coeffxsum(model_container.limitable_model.b_is_limited, limit_penalty)
+    objective_model.penalty += coeffxsum(tso_model_container.lol_model.p_global_loss_of_load, loss_of_load_cost)
+    objective_model.penalty += coeffxsum(tso_model_container.limitable_model.b_is_limited, limit_penalty)
+
+    # cost for cutting load/consumption by the market
+    objective_model.penalty += coeffxsum(bimodel_container.lower.lol_model.p_global_loss_of_load, loss_of_load_cost)
 
     objective_model.full_obj = ( objective_model.pilotable_cost +
                                 objective_model.limitable_cost +
                                 objective_model.penalty )
-    @objective(model_container.model, Min, objective_model.full_obj)
-    return model_container
+    @objective(tso_model_container.model, Min, objective_model.full_obj)
+    return tso_model_container
 end
 
 function add_tsobilevel_impositions_cost!(model_container::TSOBilevelTSOModelContainer,
@@ -886,7 +890,7 @@ function tso_bilevel(network::Networks.Network,
     #kkt complementarity
     add_kkt_complementarity_constraints!(bimodel_container_l, configs.big_m, target_timepoints, scenarios, network)
 
-    create_tso_objectives!(bimodel_container_l.upper,
+    create_tso_objectives!(bimodel_container_l,
                         target_timepoints, scenarios, network,
                         reference_schedule, #reference to see which units are currently on
                         configs.TSO_CAPPING_COST, configs.TSO_LOL_PENALTY,

@@ -8,7 +8,7 @@ using Dates
 using DataStructures
 using Printf
 
-@testset verbose=true "test_bilevel_pilotables_costing" begin
+@testset verbose=true "test_bilevel_pilotables_scenarios" begin
 
     TS = [DateTime("2015-01-01T11:00:00")]
     ech = DateTime("2015-01-01T07:00:00")
@@ -89,7 +89,7 @@ using Printf
 
         #TSO RSO constraints are OK
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
-        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"])
+        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"]) #LoL is for RSO reason but is only noticed in market
 
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S2"]) < 1e-09
         @test value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S2"]) < 1e-09
@@ -121,7 +121,6 @@ using Printf
         @test 30. ≈ value(result.upper.limitable_model.p_injected["wind_2_1",TS[1],"S1"])
         @test 70. ≈ value(result.upper.limitable_model.p_injected["wind_2_1",TS[1],"S2"])
 
-        # @test objective_value(result.upper.model) ≈ ( 65 )
     end
 
     @testset "link_scenarios_in_tso" begin
@@ -142,7 +141,7 @@ using Printf
 
         #TSO RSO constraints are OK
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
-        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"])
+        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"]) #LoL is for RSO reason but is only noticed in market
 
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S2"]) < 1e-09
         @test value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S2"]) < 1e-09
@@ -208,7 +207,7 @@ using Printf
 
         #TSO RSO constraints are OK
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
-        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"])
+        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"]) #LoL is for RSO reason but is only noticed in market
 
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S2"]) < 1e-09
         @test value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S2"]) < 1e-09
@@ -268,7 +267,7 @@ using Printf
 
         #TSO RSO constraints are OK
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S1"]) < 1e-09
-        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"])
+        @test_broken 35. ≈ value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S1"]) #LoL is for RSO reason but is only noticed in market
 
         @test value(result.upper.limitable_model.p_global_capping[TS[1],"S2"]) < 1e-09
         @test value(result.upper.lol_model.p_global_loss_of_load[TS[1],"S2"]) < 1e-09

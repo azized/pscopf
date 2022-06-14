@@ -333,7 +333,7 @@ using Printf
                         + value(result.upper.lol_model.p_loss_of_load["bus_2", TS[2],"S1"]) )
 
             #costs
-            @test value(PSCOPF.get_upper_obj_expr(result)) < 1e-09
+            @test (20*tso.configs.TSO_LOL_PENALTY) ≈ value(PSCOPF.get_upper_obj_expr(result))
             @test (20*tso.configs.MARKET_LOL_PENALTY) ≈ value(PSCOPF.get_lower_obj_expr(result))
 
         end
@@ -428,7 +428,9 @@ using Printf
             @test 5. ≈ value(result.upper.lol_model.p_loss_of_load["bus_2", TS[2],"S1"])
 
             #costs
-            @test  (5*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY) ≈ value(PSCOPF.get_upper_obj_expr(result))
+            @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (5*tso.configs.TSO_CAPPING_COST
+                                                                + 1*tso.configs.TSO_LIMIT_PENALTY
+                                                                + 5*tso.configs.TSO_LOL_PENALTY)
             @test (5*tso.configs.MARKET_CAPPING_COST + 5*tso.configs.MARKET_LOL_PENALTY) ≈ value(PSCOPF.get_lower_obj_expr(result))
         end
 
@@ -555,8 +557,8 @@ using Printf
 
         #costs
         @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (
-                    10*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY #TS1
-                    + 5*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY #TS2
+                    10*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY + 10*tso.configs.TSO_LOL_PENALTY #TS1
+                    + 5*tso.configs.TSO_CAPPING_COST + 1*tso.configs.TSO_LIMIT_PENALTY  + 5*tso.configs.TSO_LOL_PENALTY #TS2
                     )
         @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (
                     10*tso.configs.MARKET_CAPPING_COST + 10*tso.configs.MARKET_LOL_PENALTY #TS1

@@ -70,7 +70,7 @@ using Printf
         context = create_instance(30., 30.,
                                 35.)
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)
@@ -147,7 +147,7 @@ using Printf
         context = create_instance(10., 100.,
                                 35.)
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)
@@ -223,7 +223,7 @@ using Printf
         context = create_instance(400., 20.,
                                 500.)
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)
@@ -258,7 +258,7 @@ using Printf
         @test 200. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
         @test 200. ≈ value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"])
 
-        @test value(PSCOPF.get_upper_obj_expr(result)) < 1e-09
+        @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (20 *tso.configs.TSO_LOL_PENALTY)
         @test value(PSCOPF.get_lower_obj_expr(result)) ≈ ( 200*10. + 200*50.
                                                         + 20 *tso.configs.MARKET_LOL_PENALTY)
 
@@ -308,7 +308,7 @@ using Printf
         context = create_instance(400., 20.,
                                 180.)
 
-        tso = PSCOPF.TSOBilevel()
+        tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=false))
         firmness = PSCOPF.compute_firmness(tso,
                                             ech, next_ech,
                                             TS, context)
@@ -343,7 +343,7 @@ using Printf
         @test 200. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
         @test 200. ≈ value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"])
 
-        @test objective_value(result.upper.model) < 1e-09
+        @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (20 * tso.configs.TSO_LOL_PENALTY) #LoL due to Market
 
     end
 
