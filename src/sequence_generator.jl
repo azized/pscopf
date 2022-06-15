@@ -88,9 +88,13 @@ function gen_seq_mode2(seq_generator::SequenceGenerator)
                 add_step!(sequence, TSOOutFO, ech)
 
             elseif preceding_ech == fo_startpoint
-                add_step!(sequence, TSOBilevel(TSOBilevelConfigs(REF_SCHEDULE_TYPE_IN_TSO=TSO())), ech)
+                add_step!(sequence, EnergyMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=TSO())), ech)
+                add_step!(sequence, TSOBilevel(TSOBilevelConfigs(REF_SCHEDULE_TYPE_IN_TSO=TSO())), ech) #Ref can be market cause it respects the preceding TSO
                 add_step!(sequence, BalanceMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=TSO())), ech)
             else
+                add_step!(sequence, EnergyMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=Market())), ech)
+                # NOTE: The TSOBilevel considers the EnergyMarket both as a reference for deltas and for decided schedules
+                #we can keep this cause the EnergyMarket respects the decisions of the previous BalanceMarket
                 add_step!(sequence, TSOBilevel(TSOBilevelConfigs(REF_SCHEDULE_TYPE_IN_TSO=Market())), ech)
                 add_step!(sequence, BalanceMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=Market())), ech)
             end
@@ -122,11 +126,11 @@ function gen_seq_mode3(seq_generator::SequenceGenerator)
             elseif ech == fo_startpoint
                 add_step!(sequence, EnergyMarket, ech)
                 add_step!(sequence, EnterFO, ech)
-                add_step!(sequence, TSOAtFOBiLevel, ech)
+                add_step!(sequence, TSOBilevel(TSOBilevelConfigs(REF_SCHEDULE_TYPE_IN_TSO=TSO())), ech)
 
             else
                 #TODO : check if this is an EnergyMarket or BalanceMarket or another implem
-                add_step!(sequence, EnergyMarket, ech)
+                add_step!(sequence, BalanceMarket, ech)
             end
         elseif first_ts < ech
             msg = @sprintf(("Error when generating sequence: ech (%s) is after target timepoint (%s)."),

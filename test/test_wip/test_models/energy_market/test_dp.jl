@@ -107,26 +107,6 @@ using DataStructures
     end
 
     #=
-            ECH   TS
-    |        |    |
-            10h   11h
-             <---->
-               FO
-    =#
-    @testset "energy_market_cannot_be_launched_after_or_at_FO" begin
-        ech = DateTime("2015-01-01T10:00:00")
-        next_ech = DateTime("2015-01-01T10:30:00")
-        TS = [DateTime("2015-01-01T11:00:00")]
-        context, market, firmness = create_instance(ech, next_ech, TS[1],
-                                                    20., 20., 17.,
-                                                    fo_length=Hour(1)
-                                                    )
-        @test_throws ErrorException PSCOPF.run(market, ech, firmness,
-                                                PSCOPF.get_target_timepoints(context),
-                                                context)
-    end
-
-    #=
     TS: [11h]
     S: [S1]
                         bus 1

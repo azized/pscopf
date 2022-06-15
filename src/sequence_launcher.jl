@@ -165,7 +165,7 @@ end
 
 
 """
-returns the ech that come after ech at which we execute a step of the same DeciderType as the input step
+returns the ech that comes after ech at which we execute a step of the same DeciderType as the input step
 if none exists returns nothing
 """
 function get_next_ech(sequence::Sequence, index::Int, decider_step::AbstractRunnable)

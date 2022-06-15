@@ -57,8 +57,8 @@ using DataStructures
         EXPECTED_OPERATIONS = SortedDict(
             ts1 - Dates.Hour(4)      => [PSCOPF.EnergyMarket, PSCOPF.TSOOutFO],
             ts1 - Dates.Hour(1)      => [PSCOPF.EnergyMarketAtFO, PSCOPF.EnterFO, PSCOPF.TSOOutFO],
-            ts1 - Dates.Minute(30)   => [PSCOPF.TSOBilevel, PSCOPF.BalanceMarket],
-            ts1 - Dates.Minute(15)   => [PSCOPF.TSOBilevel, PSCOPF.BalanceMarket],
+            ts1 - Dates.Minute(30)   => [PSCOPF.EnergyMarket, PSCOPF.TSOBilevel, PSCOPF.BalanceMarket],
+            ts1 - Dates.Minute(15)   => [PSCOPF.EnergyMarket, PSCOPF.TSOBilevel, PSCOPF.BalanceMarket],
             ts1                      => [PSCOPF.Assessment]
         )
 
@@ -81,9 +81,9 @@ using DataStructures
 
         EXPECTED_OPERATIONS = SortedDict(
             ts1 - Dates.Hour(4)      => [PSCOPF.EnergyMarket, PSCOPF.TSOOutFO],
-            ts1 - Dates.Hour(1)      => [PSCOPF.EnergyMarket, PSCOPF.EnterFO, PSCOPF.TSOAtFOBiLevel],
-            ts1 - Dates.Minute(30)   => [PSCOPF.EnergyMarket],
-            ts1 - Dates.Minute(15)   => [PSCOPF.EnergyMarket],
+            ts1 - Dates.Hour(1)      => [PSCOPF.EnergyMarket, PSCOPF.EnterFO, PSCOPF.TSOBilevel], #FIXME or maybe TSOBilevelAtFO
+            ts1 - Dates.Minute(30)   => [PSCOPF.BalanceMarket],
+            ts1 - Dates.Minute(15)   => [PSCOPF.BalanceMarket],
             ts1                      => [PSCOPF.Assessment]
         )
 

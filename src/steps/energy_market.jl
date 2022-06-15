@@ -11,13 +11,6 @@ end
 function run(runnable::Union{EnergyMarket,BalanceMarket},
             ech::Dates.DateTime, firmness, TS::Vector{Dates.DateTime},
             context::AbstractContext)
-    fo_start_time = TS[1] - get_fo_length(get_management_mode(context))
-    if (fo_start_time <= ech) && isa(runnable, EnergyMarket)
-        msg = @sprintf("invalid %s step at ech=%s : EnergyMarket step needs to be launched before FO start (ie %s)",
-                        typeof(EnergyMarket), ech, fo_start_time)
-        throw( error(msg) )
-    end
-
     problem_name_l = @sprintf("%s_%s", typeof(runnable), ech)
 
     gratis_starts = Set{Tuple{String,Dates.DateTime}}()
