@@ -1,0 +1,4 @@
+# name          bus    inject
+prod_1      poste_1_0  140
+prod_2      poste_2_0  200
+prod_3      poste_3_0  121
