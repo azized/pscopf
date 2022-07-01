@@ -322,7 +322,7 @@ end
 function trace_limitations(tso_actions)
     println("TSO limitation actions :")
     for ((gen_id,ts), val_l) in get_limitations(tso_actions)
-        @printf("\t%s at %s : %.2f\n", gen_id, ts, val_l)
+        @printf("\t%s at %s : %s\n", gen_id, ts, val_l)
     end
 end
 function trace_impositions(tso_actions)

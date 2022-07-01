@@ -155,7 +155,7 @@ using Printf
 
         market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(CONSIDER_TSOACTIONS_LIMITATIONS=true))
 
-        PSCOPF.set_limitation_value!(context.tso_actions, "wind_1_1", TS[1], 45.)
+        PSCOPF.set_limitation_definitive_value!(context.tso_actions, "wind_1_1", TS[1], 45.)
 
         result = PSCOPF.run(market, ech, firmness,
                     PSCOPF.get_target_timepoints(context),
@@ -222,7 +222,7 @@ using Printf
 
         market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(CONSIDER_TSOACTIONS_LIMITATIONS=true))
 
-        PSCOPF.set_limitation_value!(context.tso_actions, "wind_1_1", TS[1], 30.)
+        PSCOPF.set_limitation_definitive_value!(context.tso_actions, "wind_1_1", TS[1], 30.)
 
         result = PSCOPF.run(market, ech, firmness,
                     PSCOPF.get_target_timepoints(context),

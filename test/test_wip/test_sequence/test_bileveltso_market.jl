@@ -286,7 +286,7 @@ using Printf
                 @test 35. ≈ PSCOPF.get_prod_value(context.tso_schedule, "prod_2_1", TS[1], "S1")
 
                 #no limitation #Note : even if there was, they would only appear for units that reached the DP
-                @test 65. ≈ PSCOPF.get_limitation(context.tso_actions, "wind_1_1", TS[1])
+                @test 65. ≈ PSCOPF.get_limitation(context.tso_actions, "wind_1_1", TS[1],"S1")
                 #impositions only appear at DP
                 @test !isempty(PSCOPF.get_impositions(context.tso_actions))
                 @test 20. ≈ PSCOPF.get_imposition(context.tso_actions, "prod_1_1", TS[1], "S1")[1]

@@ -256,7 +256,7 @@ function update_schedule_capping!(market_schedule, context, ech, limitable_model
 
             if capped_power > 1e-09
             #distribute the capped power on limitables
-                limitations = consider_limitations ? get_limitations(get_tso_actions(context)) : SortedDict{Tuple{String, Dates.DateTime}, Float64}()
+                limitations = consider_limitations ? get_limitations(get_tso_actions(context)) : Limitations()
                 capped_by_limitations = compute_capped(uncertainties, limitations, get_network(context), ts, s)
                 capped_by_eod = capped_power - capped_by_limitations
 
@@ -316,7 +316,7 @@ function update_schedule_loss_of_load!(market_schedule, context, ech, lol_model:
 end
 
 function get_capacity(gen_id, ts, s, limitations, uncertainties_at_ech)
-    p_lim = get_limitation(limitations, gen_id, ts)
+    p_lim = get_limitation(limitations, gen_id, ts, s)
 
     if ismissing(p_lim)
         return get_uncertainties(uncertainties_at_ech, gen_id, ts, s)
@@ -326,7 +326,7 @@ function get_capacity(gen_id, ts, s, limitations, uncertainties_at_ech)
 end
 
 function get_capped_by_limitations(gen_id, ts, s, limitations, uncertainties_at_ech)
-    p_lim = get_limitation(limitations, gen_id, ts)
+    p_lim = get_limitation(limitations, gen_id, ts, s)
 
     gen_capped = 0.
     if !ismissing(p_lim) && get_uncertainties(uncertainties_at_ech, gen_id, ts, s) > p_lim
@@ -339,7 +339,7 @@ end
 
 
 function compute_capped(uncertainties_at_ech::UncertaintiesAtEch,
-                        limitations::SortedDict{Tuple{String, Dates.DateTime}, Float64},
+                        limitations::SortedDict{Tuple{String, Dates.DateTime}, UncertainValue{Float64}},
                         limitable_generators, ts, s)
     if isempty(limitations)
         return 0.
@@ -353,7 +353,7 @@ function compute_capped(uncertainties_at_ech::UncertaintiesAtEch,
     return capped
 end
 function compute_capped(uncertainties_at_ech::UncertaintiesAtEch,
-                        limitations::SortedDict{Tuple{String, Dates.DateTime}, Float64},
+                        limitations::SortedDict{Tuple{String, Dates.DateTime}, UncertainValue{Float64}},
                         network::Networks.Network, ts, s)
     limitable_generators = Networks.get_generators_of_type(network, Networks.LIMITABLE)
     return compute_capped(uncertainties_at_ech, limitations, limitable_generators, ts, s)

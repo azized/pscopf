@@ -72,7 +72,7 @@ using DataStructures
 
         tso_actions_l = PSCOPF.get_tso_actions(context)
         if !ismissing(limit_1)
-            PSCOPF.set_limitation_value!(tso_actions_l, "wind_1_1", TS[1], limit_1)
+            PSCOPF.set_limitation_definitive_value!(tso_actions_l, "wind_1_1", TS[1], limit_1)
         end
         if !ismissing(impos_1_s1)
             PSCOPF.set_imposition_value!(tso_actions_l, "prod_1_1", TS[1], "S1", impos_1_s1[1], impos_1_s1[2])
