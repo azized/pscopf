@@ -131,7 +131,7 @@ end
 function solve!(model::AbstractModel,
                 problem_name="problem", out_folder=nothing,
                 optimizer=OPTIMIZER)
-    problem_name_l = replace(problem_name, ":"=>"_")
+    problem_name_l = valid_filename(problem_name)
     set_optimizer(model, optimizer);
 
     if !isnothing(out_folder)
@@ -1326,9 +1326,10 @@ end
      some constraints that have non-negative slack might be influential/active
 """
 function log_flows(model_container,network,out_folder,filename)
+    filename_l = valid_filename(filename)
     flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr} = get_flows(model_container)
     if !isnothing(out_folder)
-        log_file_l = joinpath(out_folder, filename*"_flows.log")
+        log_file_l = joinpath(out_folder, filename_l*"_flows.log")
         open(log_file_l, "w") do file_l
             line_l = @sprintf("branch_id  %15s  s  ptdf_case  flow_value flow_limit\n", "ts")
             @debug line_l

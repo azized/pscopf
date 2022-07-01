@@ -153,3 +153,11 @@ function normalize_values(d::AbstractDict, normalize_zero::Bool=true)
 
     return Dict(zip( keys(d), normalized_values ))
 end
+
+
+"""
+produce a filename compatible with windows platform (win does not accept ":" in filenames)
+"""
+function valid_filename(filename_p::String)
+    return replace(filename_p, ":"=>"_")
+end
