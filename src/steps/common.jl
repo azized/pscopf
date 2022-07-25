@@ -99,31 +99,66 @@ function get_status(model_container_p::AbstractModelContainer)::PSCOPFStatus
     end
 end
 
-function solve_2steps_deltas!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
+
+"""
+    set_start_values!(model)
+Set start values for the model to the solved values in the input model.
+Note :
+    The model is no longer optimized, it goes back to a OPTIMIZE_NOT_CALLED state
+"""
+function set_start_values!(model)
+    start_values = Dict{VariableRef, Float64}()
+
+    for var in all_variables(model)
+        start_values[var] = value(var)
+    end
+    for (var,val) in start_values
+        set_start_value(var, val)
+    end
+
+    return model
+end
+
+function solve_step1!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
+    model_l = get_model(model_container)
+
     obj = model_container.objective_model.full_obj_1
-    @objective(get_model(model_container), Min, obj)
+    @objective(model_l, Min, obj)
     solve!(model_container, configs.problem_name*"_step1", configs.out_path)
     @info "deltas current value : $(value(model_container.objective_model.deltas))"
     @info "step2 objective current value : $(value(model_container.objective_model.full_obj_2))"
+end
 
+function solve_step2!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
     if (get_status(model_container)!=pscopf_INFEASIBLE
         && value(model_container.objective_model.deltas)>0 )
-        bound_sum_p_deltas(model_container)
+
+        model_l = get_model(model_container)
+
+        # before invalidating the model,
+        value_sum_deltas_l = value(model_container.objective_model.deltas)
+        set_start_values!(model_l)
+
+        bound_sum_p_deltas!(model_container, value_sum_deltas_l)
 
         obj = model_container.objective_model.full_obj_2
-        @objective(get_model(model_container), Min, obj)
+        @objective(model_l, Min, obj)
         solve!(model_container, configs.problem_name*"_step2", configs.out_path)
         @info "step 1 objective current value (deltas+penalty) : $(value(model_container.objective_model.full_obj_1))"
         @info "step 1 objective current value (deltas) : $(value(model_container.objective_model.deltas))"
     end
 end
 
-function bound_sum_p_deltas(model_container::AbstractModelContainer)
+function solve_2steps_deltas!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
+    solve_step1!(model_container, configs)
+    solve_step2!(model_container, configs)
+end
+
+function bound_sum_p_deltas!(model_container::AbstractModelContainer, value_sum_deltas::Float64)
     model_l = get_model(model_container)
     deltas_expr = model_container.objective_model.deltas
-    value_sum_deltas = value(deltas_expr)
 
-    @constraint(model_l, deltas_expr<=value_sum_deltas)
+    model_container.deltas_bounding_constraint = @constraint(model_l, deltas_expr<=value_sum_deltas)
     return model_container
 end
 
@@ -195,6 +230,14 @@ function solve!(model_container::AbstractModelContainer, problem_name, out_path)
     return model_container
 end
 
+function write_solution(filename, model)
+    open(filename, "w") do file_l
+        for var in all_variables(model)
+            Base.write(file_l, @sprintf("%60s = %f\n", name(var), value(var)))
+        end
+    end
+end
+
 function has_positive_slack(model_container)::Bool
     error("unimplemented")
 end
@@ -207,6 +250,10 @@ function requires_linking(firmness::DecisionFirmness, do_link::Bool=false)::Bool
     return do_link || (firmness in [DECIDED, TO_DECIDE])
 end
 
+
+function get_deltas_bounding_constraint(model_container::AbstractModelContainer)::Union{ConstraintRef, Missing}
+    return model_container.deltas_bounding_constraint
+end
 
 # AbstractGeneratorModel
 ############################

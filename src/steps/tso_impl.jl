@@ -80,6 +80,8 @@ end
         SortedDict{Tuple{String,DateTime,String,String},AffExpr}()
     rso_constraints::SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}} =
         SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}}()
+    #deltas constraint
+    deltas_bounding_constraint::Union{ConstraintRef, Missing} = missing
 end
 
 function has_positive_slack(model_container::TSOModel)::Bool

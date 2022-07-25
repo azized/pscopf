@@ -124,7 +124,7 @@ end
 #        TSOBilevel Model
 ##########################################################
 
-@with_kw struct TSOBilevelTSOModelContainer <: AbstractModelContainer
+@with_kw mutable struct TSOBilevelTSOModelContainer <: AbstractModelContainer
     model::Model
     limitable_model::TSOBilevelTSOLimitableModel = TSOBilevelTSOLimitableModel()
     pilotable_model::TSOBilevelTSOPilotableModel = TSOBilevelTSOPilotableModel()
@@ -137,6 +137,8 @@ end
         SortedDict{Tuple{String,DateTime,String,String},AffExpr}()
     rso_constraints::SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}} =
         SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}}()
+    #deltas constraint
+    deltas_bounding_constraint::Union{ConstraintRef, Missing} = missing
 end
 @with_kw struct TSOBilevelMarketModelContainer <: AbstractModelContainer
     model::Model
