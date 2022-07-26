@@ -10,6 +10,7 @@ const DEFAULT_CONFIGS = (
     tso_pilotable_bounding_cost = 1.,
     market_capping_cost = 1.,
 
+    lol_eps = 1e-04,
 
     ADD_RSO_CSTR_DYNAMICALLY = false,
     CONSIDER_N_1 = true,

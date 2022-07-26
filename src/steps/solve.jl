@@ -27,12 +27,9 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
         solve_fct(model_container, configs)
 
         # model is infeasible, adding constraints will not solve the issue
-        if get_status(model_container) in [pscopf_INFEASIBLE, ] #pscopf_HAS_SLACK
-            error("CHECK STATUS")
-            return
-        end
-        if get_status(model_container) == pscopf_HAS_SLACK
+        if get_status(model_container) in [pscopf_INFEASIBLE, pscopf_HAS_SLACK]
             @warn("check status : may be due to numerical errors")
+            return
         end
 
         did_add_constraints = generate_rso_constraints!(model_container, uncertainties_at_ech, network)

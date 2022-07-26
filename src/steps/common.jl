@@ -1049,8 +1049,7 @@ function get_local_lol(model_container::AbstractModelContainer)
 end
 
 function has_positive_value(dict_vars::AbstractDict{T,V}) where T where V <: AbstractVariableRef
-    return any(e -> value(e[2]) > 1e-09, dict_vars)
-    #e.g. 1e-15 is supposed to be 0.
+    return any(e -> value(e[2]) > get_config("lol_eps"), dict_vars)
 end
 
 function add_lol_vars!(model_container::AbstractModelContainer, target_timepoints, scenarios,
