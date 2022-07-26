@@ -122,6 +122,13 @@ end
 function solve_step1!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
     model_l = get_model(model_container)
 
+    # delete old bound if needed
+    deltas_cstr = get_deltas_bounding_constraint(model_container)
+    if !ismissing(deltas_cstr)
+        delete(model_l, deltas_cstr)
+        unregister(model_l, :deltas_cstr)
+    end
+
     obj = model_container.objective_model.full_obj_1
     @objective(model_l, Min, obj)
     solve!(model_container, configs.problem_name*"_step1", configs.out_path)
@@ -1263,20 +1270,20 @@ end
 function add_rso_flows_exprs!(model_container::AbstractModelContainer,
                 combinations_to_add, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
                 uncertainties_at_ech, network::Networks.Network)
-    flows = get_flows(model_container)
     for (branch_id, ts, s, ptdf_case) in combinations_to_add
         branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
         flow_expr_l = flow_expr(model_container,
                                 branch, ts, s, ptdf_case,
                                 uncertainties_at_ech, network)
-        add_rso_flow_expr!(flows, flow_expr_l,
+        add_rso_flow_expr!(model_container, flow_expr_l,
                         branch, ts, s, ptdf_case)
     end
 end
 
-function add_rso_flow_expr!(flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
+function add_rso_flow_expr!(model_container::AbstractModelContainer,
                 flow_expr::AffExpr,
                 branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String)
+    flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr} = get_flows(model_container)
     branch_id = Networks.get_id(branch)
     flows[branch_id, ts, s, ptdf_case] = flow_expr
 end
@@ -1285,6 +1292,11 @@ function flow_expr(model_container::AbstractModelContainer,
                     branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
                     uncertainties_at_ech, network::Networks.Network)
     branch_id = Networks.get_id(branch)
+
+    flow_l = get(get_flows(model_container), (branch_id, ts, s, ptdf_case), missing)
+    if !ismissing(flow_l)
+        return flow_l
+    end
 
     flow_l = AffExpr()
     for bus in Networks.get_buses(network)

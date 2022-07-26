@@ -279,7 +279,7 @@ function tso_out_fo(network::Networks.Network,
     @timeit TIMER_TRACKS "tso_solve" tso_solve!(model_container_l,
                                             solve_2steps_deltas!, configs,
                                             uncertainties_at_ech, network,
-                                            false)
+                                            get_config("ADD_RSO_CSTR_DYNAMICALLY"))
     log_flows(model_container_l, network, configs.out_path, configs.problem_name)
 
     return model_container_l
