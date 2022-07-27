@@ -1409,16 +1409,21 @@ function log_flows(model_container,network,out_folder,filename)
         end
     end
 
-    nb_potential_cstrs = length(get_rso_combinations(model_container)) # lb <= flow <= ub counts as one constraint
-    nb_active_cstrs = 0
-    for (_, (cstr_lb,cstr_ub)) in get_rso_constraints(model_container)
-        if !has_slack(cstr_lb) || !has_slack(cstr_ub)
-            nb_active_cstrs += 1
+    if get_config("CNT_ACTIVE_RSO_CSTRS")
+        @warn "This section is time consuming deactivate it with : set_config!(\"CNT_ACTIVE_RSO_CSTRS\", false)"
+
+        nb_potential_cstrs = length(get_rso_combinations(model_container)) # lb <= flow <= ub counts as one constraint
+        nb_active_cstrs = 0
+        for (_, (cstr_lb,cstr_ub)) in get_rso_constraints(model_container)
+            if !has_slack(cstr_lb) || !has_slack(cstr_ub)
+                nb_active_cstrs += 1
+            end
         end
+
+        msg_l = @sprintf("at least %d/%d RSO constraints are active!", nb_active_cstrs, nb_potential_cstrs)
+        @info msg_l
+        open(get_config("TEMP_GLOBAL_LOGFILE"), "a") do file_l write(file_l, msg_l*"\n") end
     end
-    msg_l = @sprintf("at least %d/%d RSO constraints are active!", nb_active_cstrs, nb_potential_cstrs)
-    @info msg_l
-    open(get_config("TEMP_GLOBAL_LOGFILE"), "a") do file_l write(file_l, msg_l*"\n") end
 end
 
 function sort_by_cut_branch(flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr})
