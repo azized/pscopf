@@ -1311,21 +1311,21 @@ function flow_expr(model_container::AbstractModelContainer,
         for gen in Networks.get_generators_of_type(bus, Networks.LIMITABLE)
             gen_id = Networks.get_id(gen)
             var_p_injected = get_p_injected(model_container, Networks.LIMITABLE)[gen_id, ts, s]
-            flow_l += ptdf * var_p_injected
+            add_to_expression!(flow_l, ptdf*var_p_injected)
         end
 
         # + injections pilotables
         for gen in Networks.get_generators_of_type(bus, Networks.PILOTABLE)
             gen_id = Networks.get_id(gen)
             var_p_injected = get_p_injected(model_container, Networks.PILOTABLE)[gen_id, ts, s]
-            flow_l += ptdf * var_p_injected
+            add_to_expression!(flow_l, ptdf*var_p_injected)
         end
 
         # - loads
-        flow_l -= ptdf * get_uncertainties(uncertainties_at_ech, bus_id, ts, s)
+        add_to_expression!(flow_l, -ptdf * get_uncertainties(uncertainties_at_ech, bus_id, ts, s))
 
         # + cutting loads ~ injections
-        flow_l += ptdf * get_local_lol(model_container)[bus_id, ts, s]
+        add_to_expression!(flow_l, ptdf * get_local_lol(model_container)[bus_id, ts, s])
     end
 
     return flow_l
