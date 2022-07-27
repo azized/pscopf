@@ -90,9 +90,12 @@ end
 function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next_ech)
     println("-"^20)
     println(typeof(step))
+    @debug "firmness .."
     firmness = compute_firmness(step, ech, next_ech,
                             get_target_timepoints(context_p), context_p)
+    @debug "trace .."
     trace_firmness(firmness)
+    @debug "build and run model .."
     @timeit TIMER_TRACKS "run_model" result = run(step, ech, firmness,
                                                 get_target_timepoints(context_p),
                                                 context_p)
@@ -108,6 +111,7 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
         #TODO : error if !verify
         verify_firmness(firmness, context_p.market_schedule,
                         excluded_ids=get_limitables_ids(context_p))
+        @debug "trace .."
         PSCOPF.PSCOPFio.write(context_p, get_market_schedule(context_p), "market_")
         PSCOPF.PSCOPFio.write_full(context_p, get_market_schedule(context_p), "market_")
         update_market_flows!(context_p)
@@ -125,6 +129,7 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
         #TODO : error if !verify
         verify_firmness(firmness, context_p.tso_schedule,
                         excluded_ids=get_limitables_ids(context_p))
+        @debug "trace .."
         PSCOPF.PSCOPFio.write(context_p, get_tso_schedule(context_p), "tso_")
         PSCOPF.PSCOPFio.write_full(context_p, get_tso_schedule(context_p), "tso_")
         update_tso_flows!(context_p)
@@ -137,17 +142,20 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
         @debug "update TSO actions based on optimization results"
         update_tso_actions!(context_p,
                             ech, result, firmness, step)
+        @debug "trace .."
         trace_tso_actions(get_tso_actions(context_p))
     end
     end
     #TODO check coherence between tso schedule and actions
 
     if ( (affects_market_schedule(step) || affects_tso_schedule(step)) )
+    @timeit TIMER_TRACKS "trace_delta_schedules" begin
         schedules_to_delta = sort([get_market_schedule(context_p), get_tso_schedule(context_p)],
                                     by=x->x.decision_time)
         @printf("changes in %s schedule compared to preceding %s schedule:\n",
                 schedules_to_delta[2].decider_type, schedules_to_delta[1].decider_type)
         trace_delta_schedules(schedules_to_delta...)
+    end
     end
 
     return result, firmness
@@ -332,7 +340,7 @@ function trace_impositions(tso_actions)
     end
 end
 
-function log_nb_rso_cstrs(::String, ::Union{Nothing,AbstractModelContainer}, ::String, ::DateTime)
+function log_nb_rso_cstrs(::Any, ::Union{Nothing,AbstractModelContainer}, ::Any, ::Any)
 end
 function log_nb_rso_cstrs(logfile::String,
                         result::Union{TSOModel, TSOBilevel, TSOBilevelModel, TSOBilevelTSOModelContainer},
@@ -354,7 +362,8 @@ function log_nb_rso_cstrs(logfile::String,
     end
 
     if get_config("LOG_COMBINATIONS")
-        open(joinpath(outdir, @sprintf("combinations_%s.log", ech)), "w") do file_l
+        filename_l = valid_filename(joinpath(outdir, @sprintf("combinations_%s.log", ech)))
+        open(filename_l, "w") do file_l
             for (branch,ts,s,network_case) in keys(get_rso_constraints(result))
                 Base.write(file_l, @sprintf("%s %s %s %s\n", branch, ts, s, network_case))
             end

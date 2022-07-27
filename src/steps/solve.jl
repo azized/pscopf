@@ -3,17 +3,21 @@ function tso_solve!(model_container::AbstractModelContainer,
                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network,
                 dynamic_solving::Bool)
     if dynamic_solving
-        iterative_solve_on_rso_constraints!(model_container,
-                                        solve_fct, configs, uncertainties_at_ech, network)
+        @timeit TIMER_TRACKS "tso_dynamic_solve" iterative_solve_on_rso_constraints!(model_container,
+                                                                            solve_fct, configs, uncertainties_at_ech, network)
     else
-        add_rso_flows_exprs!(model_container,
-                            get_rso_combinations(model_container),
-                            uncertainties_at_ech,
-                            network)
-        add_rso_constraints!(model_container,
-                            get_rso_combinations(model_container),
-                            network)
-        solve_fct(model_container, configs)
+        @debug "adding RSO constraints"
+        @timeit TIMER_TRACKS "tso_modeling" begin
+            add_rso_flows_exprs!(model_container,
+                                get_rso_combinations(model_container),
+                                uncertainties_at_ech,
+                                network)
+            add_rso_constraints!(model_container,
+                                get_rso_combinations(model_container),
+                                network)
+        end
+        @debug "tso_solve!: actual solve"
+        @timeit TIMER_TRACKS "tso_solve" solve_fct(model_container, configs)
     end
 end
 

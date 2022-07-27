@@ -1013,17 +1013,17 @@ function tso_bilevel(network::Networks.Network,
     @assert(all( configs.big_m > Networks.get_prop_cost(gen)
                 for gen in Networks.get_generators_of_type(network, Networks.PILOTABLE) ))
 
-    @timeit TIMER_TRACKS "tsobilevel_modeling" bimodel_container_l = create_tso_bilevel_model(network,
+    @timeit TIMER_TRACKS "tso_modeling" bimodel_container_l = create_tso_bilevel_model(network,
                                                                         target_timepoints, generators_initial_state,
                                                                         scenarios, uncertainties_at_ech, firmness,
                                                                         preceding_market_schedule, preceding_tso_schedule,
                                                                         configs)
 
-    @timeit TIMER_TRACKS "tsobilevel_solve" tso_solve!(bimodel_container_l,
-                                                    launch_solve!, configs,
-                                                    uncertainties_at_ech, network,
-                                                    get_config("ADD_RSO_CSTR_DYNAMICALLY"))
-    log_flows(bimodel_container_l.upper, network, configs.out_path, configs.problem_name)
+    tso_solve!(bimodel_container_l,
+                launch_solve!, configs,
+                uncertainties_at_ech, network,
+                get_config("ADD_RSO_CSTR_DYNAMICALLY"))
+    @timeit TIMER_TRACKS "logs" log_flows(bimodel_container_l.upper, network, configs.out_path, configs.problem_name)
 
     return bimodel_container_l
 end

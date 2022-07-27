@@ -276,11 +276,12 @@ function tso_out_fo(network::Networks.Network,
                                                                             gratis_starts,
                                                                             configs)
 
-    @timeit TIMER_TRACKS "tso_solve" tso_solve!(model_container_l,
-                                            solve_2steps_deltas!, configs,
-                                            uncertainties_at_ech, network,
-                                            get_config("ADD_RSO_CSTR_DYNAMICALLY"))
-    log_flows(model_container_l, network, configs.out_path, configs.problem_name)
+    tso_solve!(model_container_l,
+                solve_2steps_deltas!, configs,
+                uncertainties_at_ech, network,
+                get_config("ADD_RSO_CSTR_DYNAMICALLY"))
+
+    @timeit TIMER_TRACKS "logs" log_flows(model_container_l, network, configs.out_path, configs.problem_name)
 
     return model_container_l
 end
