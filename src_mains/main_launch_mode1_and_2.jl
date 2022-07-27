@@ -42,7 +42,7 @@ end
 # INPUT & PARAMS
 ###############################################
 
-matpower_case = "case14"
+matpower_case = "case5"
 input_path = ( length(ARGS) > 0 ? ARGS[1] :
                     joinpath(@__DIR__, "..", "data_matpower", matpower_case) )
 output_folder = joinpath(@__DIR__, "..", "data", matpower_case)
@@ -64,10 +64,19 @@ logfile = PSCOPF.get_config("TEMP_GLOBAL_LOGFILE")
 open(logfile, "a") do file_l
     write(file_l, "-"^120 * "\n")
     write(file_l, @sprintf("usecase : %s\n", output_folder))
-    write(file_l, "dynamic? : FALSE\n")
+    write(file_l, @sprintf("dynamic? : %s\n", PSCOPF.get_config("ADD_RSO_CSTR_DYNAMICALLY")))
     write(file_l, @sprintf("n-1? : %s\n", PSCOPF.get_config("CONSIDER_N_1")))
     write(file_l, @sprintf("nb rso constraints : %d\n", PSCOPF.nb_rso_constraint(generated_network, length(PSCOPF.get_scenarios(uncertainties)), length(TS))))
 end
+
+###############################################
+# LOL sensibility problems
+###############################################
+PSCOPF.set_config!("tso_loss_of_load_penalty_value", 1e6)
+PSCOPF.set_config!("market_loss_of_load_penalty_value", 1e6)
+PSCOPF.set_config!("big_m_value", 2.e6)
+PSCOPF.set_config!("ADD_RSO_CSTR_DYNAMICALLY", true)
+PSCOPF.set_config!("LOG_COMBINATIONS", true)
 
 
 ###############################################
