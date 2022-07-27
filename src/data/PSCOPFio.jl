@@ -205,7 +205,8 @@ end
 #   Writers
 ##########################
 
-function write(dir_path::String, network::Networks.Network)
+function write(dir_path::String, network::Networks.Network;
+            ignore_units=false, ignore_limits=false, ignore_ptdf=false)
     mkpath(dir_path)
     # if !isdir(dir_path)
     #     mkpath(dir_path)
@@ -214,11 +215,17 @@ function write(dir_path::String, network::Networks.Network)
     #     error(msg)
     # end
     #units
-    write(dir_path, network.generators)
+    if !ignore_units
+        write(dir_path, network.generators)
+    end
     #limits
-    write(dir_path, network.branches)
+    if !ignore_limits
+        write(dir_path, network.branches)
+    end
     #ptdf
-    write(dir_path, network.ptdf)
+    if !ignore_ptdf
+        write(dir_path, network.ptdf)
+    end
 end
 
 function write(dir_path::String, generators::SortedDict{String, Networks.Generator})

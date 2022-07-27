@@ -106,6 +106,7 @@ function generate_initial_network(ptdf_network::PTDF.Network,
     #Limitables
     ############
     # None for now
+    @warn "No Limitables in the network"
 
     #Pilotables
     ############
@@ -124,6 +125,9 @@ function generate_init_state(initial_network, output_folder)
     return gen_init
 end
 
+"""
+randomly distribute a ratio (conso_ratio) of the network's capacity (sum of p_max) on buses
+"""
 function generate_base_consumptions(network::PSCOPF.Network,
                                     ech::DateTime, ts::DateTime, base_s::String,
                                     conso_ratio::Float64)::PSCOPF.Uncertainties
@@ -222,6 +226,14 @@ function press_to_continue()
     enable_timer!(PSCOPF.TIMER_TRACKS)
 end
 
+"""
+1- creates a symlink to the ptdf file if it exists otherwise it computes it (NOTE : existence verification is based on file name not on file content)
+2- Generate initial network : randomly generated pilotable units and default limits on branches
+3- Generate a base consumption for buses (a single scenario, a single ts)
+4- Launch a TSO model to compute base flows using the base consumptions
+5- Update Network branch limits using the computed flows and write the partial instance
+6- Generate consumption uncertainties randomly based on the base consumptions
+"""
 function main_instance_generate(input_path,
             ref_bus_num, distributed,
             default_limit, nb_generators_probabilities, pilotables_templates,
@@ -235,26 +247,41 @@ function main_instance_generate(input_path,
     ###############################################
     # COMPUTE PTDF for N and N-1
     ###############################################
-    ptdf_network = PTDF.read_network(input_path)
-    time_ptdf = @elapsed PTDF.compute_and_write_n_non_bridges(ptdf_network, ref_bus_num, distributed, 1e-6, input_path, output_folder)
+    @info "#### COMPUTE PTDF N and N-1 ####"
+    time_ptdf = @elapsed begin
+        ptdf_network = PTDF.read_network(input_path)
+        out_ptdf_file = joinpath(output_folder, PTDF.PTDF_FILENAME)
+        in_possible_ptdf_file = joinpath(input_path, PTDF.PTDF_FILENAME)
+        if isfile(out_ptdf_file)
+            @info @sprintf("a PTDF file was already found in %s. PTDF was not recomputed!", out_ptdf_file)
+        elseif isfile(in_possible_ptdf_file)
+            mkpath(output_folder)
+            symlink(abspath(in_possible_ptdf_file), out_ptdf_file)
+            @info @sprintf("a PTDF file was already found in %s. Created a symlink to the existing file!", in_possible_ptdf_file)
+        else
+            PTDF.compute_and_write_n_non_bridges(ptdf_network, ref_bus_num, distributed, 1e-6, input_path, output_folder)
+        end
+    end
 
 
     ###############################################
     # Generate Initial Network
     ###############################################
+    @info "#### Generate Initial Network ####"
     initial_network = generate_initial_network(ptdf_network,
                                             output_folder,
                                             default_limit,
                                             nb_generators_probabilities, pilotables_templates)
     gen_init = generate_init_state(initial_network, output_folder)
-    PSCOPF.PSCOPFio.write(joinpath(output_folder, "initial_network"), initial_network)
+    PSCOPF.PSCOPFio.write(joinpath(output_folder, "initial_network"), initial_network, ignore_ptdf=true)
+    symlink(abspath(out_ptdf_file), joinpath(output_folder, "initial_network", PTDF.PTDF_FILENAME))
     PSCOPF.PSCOPFio.write(joinpath(output_folder, "initial_network"), gen_init)
-    PSCOPF.PSCOPFio.write(joinpath(output_folder, "instance"), gen_init)
 
 
     ###############################################
     # Generate Base Uncertainties for limits
     ###############################################
+    @info "#### Generate Base Uncertainties for limits ####"
     base_consumptions = generate_base_consumptions(initial_network, ech, ts, "BASE_S", limits_conso_to_unit_capa_ratio)
     PSCOPF.PSCOPFio.write(joinpath(output_folder, "initial_network"), base_consumptions)
 
@@ -262,6 +289,7 @@ function main_instance_generate(input_path,
     ###############################################
     # Compute Base Flows
     ###############################################
+    @info "#### Compute Base Flows ####"
     time_free_flows = @elapsed free_flows = compute_free_flows(initial_network, ech, ts, gen_init, base_consumptions,
                                                             joinpath(output_folder, "init_limits"))
 
@@ -270,14 +298,18 @@ function main_instance_generate(input_path,
     ###############################################
     # Generate Network : update branch limits
     ###############################################
+    @info "#### Update Limits and Write Network instance ####"
     update_network_limits!(initial_network, free_flows, limit_to_free_flow_ratio)
     generated_network = initial_network
-    PSCOPF.PSCOPFio.write(instance_path, generated_network)
+    PSCOPF.PSCOPFio.write(instance_path, generated_network, ignore_ptdf=true)
+    symlink(abspath(out_ptdf_file), joinpath(instance_path, PTDF.PTDF_FILENAME))
+    PSCOPF.PSCOPFio.write(joinpath(output_folder, "instance"), gen_init)
 
 
     ###############################################
     # Generate Uncertainties
     ###############################################
+    @info "#### Generate Instance Uncertainties ####"
     base_uncertainties = multiply(base_consumptions, 0.7)
     uncertainties = generate_uncertainties(generated_network, base_uncertainties[ech], ts, "BASE_S", ECH, nb_scenarios, prediction_error)
     PSCOPF.PSCOPFio.write(instance_path, uncertainties)
@@ -290,7 +322,7 @@ end
 ###############################################
 Random.seed!(0)
 
-matpower_case = "case14"
+matpower_case = "case5"
 input_path = ( length(ARGS) > 0 ? ARGS[1] :
                     joinpath(@__DIR__, "..", "data_matpower", matpower_case) )
 output_folder = joinpath(@__DIR__, "..", "data", matpower_case)
