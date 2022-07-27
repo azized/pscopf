@@ -18,6 +18,7 @@ const DEFAULT_CONFIGS = (
 
     PSCOPF_TIME_LIMIT_IN_SECONDS = nothing,
     PSCOPF_REDIRECT_LOG = true,
+    SOLVER_LP_FILES = false,
 
     LOG_COMBINATIONS = false,
     LOG_NB_CSTRS_FILENAME = joinpath(@__DIR__, "..", "nbCSTRS.log"), # temporary file to log number of added constraints : TODO : do not use

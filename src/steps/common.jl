@@ -181,16 +181,18 @@ function solve!(model::AbstractModel,
         model_file_l = joinpath(out_folder, problem_name_l*".lp")
         write_to_file(model, model_file_l)
 
-        #MathProgBase.writeproblem(getSolverModel(model),model_file_l)
+        if get_config("SOLVER_LP_FILES")
 
-        model_file_l_new = joinpath(out_folder, problem_name_l*"_new.lp")
+            model_file_l_new = joinpath(out_folder, problem_name_l*"_new.lp")
 
-        MOI.Utilities.attach_optimizer(model)
-        internalModel = unsafe_backend(model)
-        if OPTIMIZER_NAME == "Xpress"
-            Xpress.writeprob(internalModel.inner, model_file_l_new, "-l");
-        elseif OPTIMIZER_NAME == "CPLEX"
-            CPLEX.CPXwriteprob(internalModel.env, internalModel.lp, model_file_l_new, "lp")
+            MOI.Utilities.attach_optimizer(model)
+            internalModel = unsafe_backend(model)
+            if OPTIMIZER_NAME == "Xpress"
+                Xpress.writeprob(internalModel.inner, model_file_l_new, "-l");
+            elseif OPTIMIZER_NAME == "CPLEX"
+                CPLEX.CPXwriteprob(internalModel.env, internalModel.lp, model_file_l_new, "lp")
+            end
+
         end
 
         log_file_l = joinpath(out_folder, problem_name_l*".log")
