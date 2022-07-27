@@ -43,7 +43,9 @@ using Parameters
     full_obj = AffExpr(0.)
 end
 
-
+function total_lol(model_container::EODAssessmentModel)
+    return nothing
+end
 
 function add_load_uncertainties_vars!(model_container::EODAssessmentModel,
                                     network, TS, assessment_uncertainties)

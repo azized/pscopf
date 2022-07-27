@@ -230,8 +230,11 @@ function solve!(model_container::AbstractModelContainer, problem_name, out_path)
         @error "model status is infeasible!"
     elseif solve_pscopf_status == pscopf_HAS_SLACK
         @warn "model solved optimally but slack variables were used!"
-        total_lol_l = total_lol(model_container)
-        @info "LoL = $(total_lol_l)"
+    end
+
+    total_lol_l = total_lol(model_container)
+    if !isnothing(total_lol_l)
+        @info @sprintf("LoL = %.10f", total_lol_l)
     end
 
     return model_container

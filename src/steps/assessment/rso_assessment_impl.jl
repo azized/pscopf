@@ -51,6 +51,10 @@ using Parameters
     full_obj::AffExpr = AffExpr(0.)
 end
 
+function total_lol(model_container::RSOAssessmentModel)
+    return nothing
+end
+
 function add_load_uncertainties_vars!(model_container::RSOAssessmentModel,
                                     network, TS, assessment_uncertainties)
     for bus in Networks.get_buses(network)
