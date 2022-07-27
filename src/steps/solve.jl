@@ -42,7 +42,7 @@ end
 
 function generate_rso_constraints!(model_container::AbstractModelContainer,
                                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
-    max_add_per_iter = 20
+    max_add_per_iter = get_config("MAX_ADD_RSO_CSTR_PER_ITER")
     violated_combinations_to_add = Vector{Tuple{Networks.Branch,DateTime,String,String}}()
     for (branch_id,ts,s,network_case) in get_rso_combinations(model_container)
         # constraint not considered in the model yet
