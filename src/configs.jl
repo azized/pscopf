@@ -19,6 +19,8 @@ const DEFAULT_CONFIGS = (
     PSCOPF_TIME_LIMIT_IN_SECONDS = nothing,
     PSCOPF_REDIRECT_LOG = true,
 
+    LOG_COMBINATIONS = false,
+    LOG_NB_CSTRS_FILENAME = joinpath(@__DIR__, "..", "nbCSTRS.log"), # temporary file to log number of added constraints : TODO : do not use
     TEMP_GLOBAL_LOGFILE = joinpath(@__DIR__, "..", "timingsRSO.log") # temporary file to study RSO constraints behaviour : TODO : do not use
 )
 

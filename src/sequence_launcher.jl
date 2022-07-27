@@ -96,7 +96,7 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
     @timeit TIMER_TRACKS "run_model" result = run(step, ech, firmness,
                                                 get_target_timepoints(context_p),
                                                 context_p)
-
+    log_nb_rso_cstrs(get_config("LOG_NB_CSTRS_FILENAME"), result, context_p.out_dir, ech)
 
     if affects_market_schedule(step)
     @timeit TIMER_TRACKS "update_schedules" begin
@@ -329,5 +329,35 @@ function trace_impositions(tso_actions)
     println("TSO imposition actions :")
     for ((gen_id,ts), imposition) in get_impositions(tso_actions)
         @printf("\t%s at %s : %s\n", gen_id, ts, imposition)
+    end
+end
+
+function log_nb_rso_cstrs(::String, ::Union{Nothing,AbstractModelContainer}, ::String, ::DateTime)
+end
+function log_nb_rso_cstrs(logfile::String,
+                        result::Union{TSOModel, TSOBilevel, TSOBilevelModel, TSOBilevelTSOModelContainer},
+                        outdir::String, ech::DateTime)
+    #TODO : avoid hardcode
+    index = findfirst("pscopf", lowercase(outdir))
+    usecase_name = outdir[(isnothing(index) ? 1 : first(index)) : end]
+    if filesize(logfile) == 0
+        open(logfile, "w") do file_l
+            Base.write(file_l, "#usecase model ech status added_rso_cstrs total_rso_cstrs ratio_cstrs LoL\n")
+        end
+    end
+    open(logfile, "a") do file_l
+        considered = length(get_rso_constraints(result))
+        possible = length(get_rso_combinations(result))
+        Base.write(file_l, @sprintf("#%s %s %s %s %d %d %.3f %s\n",
+                                usecase_name, typeof(result), ech, get_status(result),
+                                considered, possible, considered/possible, total_lol(result) ))
+    end
+
+    if get_config("LOG_COMBINATIONS")
+        open(joinpath(outdir, @sprintf("combinations_%s.log", ech)), "w") do file_l
+            for (branch,ts,s,network_case) in keys(get_rso_constraints(result))
+                Base.write(file_l, @sprintf("%s %s %s %s\n", branch, ts, s, network_case))
+            end
+        end
     end
 end
