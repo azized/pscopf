@@ -10,6 +10,7 @@ using SparseArrays, LinearAlgebra
 include("utils.jl")
 
 BASECASE = "BASECASE"
+PTDF_FILENAME = "pscopf_ptdf.txt"
 
 mutable struct Bus
     id::Int #bus.num
@@ -79,7 +80,7 @@ end
 
 function cut_branch!(network::Network, i_branch_to_cut::Int)
     cut_branch = pop!(network.branches, i_branch_to_cut)
-    @info("removed branch ", cut_branch.name, " from network!")
+    @debug("removed branch ", cut_branch.name, " from network!")
     #no deletion in branch_to_i to keep the idx and to show the branch in the output but with zeros
     #change branch_to_i ?
     return cut_branch, network
@@ -88,7 +89,7 @@ end
 function reduced_network(network::Network, i_branch_to_cut::Int)
     # if a new CC is generated even the EOD constraint is no longer global,
     #the two induced networks function independantly
-    @warn("PTDF does not verify that the network is still connected and that no new CC was generated!")
+    @debug("PTDF does not verify that the network is still connected and that no new CC was generated!")
     network_l = deepcopy(network)
 
     return cut_branch!(network_l, i_branch_to_cut)
@@ -320,7 +321,7 @@ function compute_and_write(network_p, ref_bus_num_p, distributed_p, eps_diag_p, 
         #                 "poste_2_0" => .8])
         # ptdf_l = PTDF.distribute_slack(ptdf_l, coeffs, network_l);
     end
-    filename = "pscopf_ptdf.txt"
+    filename = PTDF_FILENAME
     output_path = joinpath(outdir, filename)
     #use original network to print full ptdf containing the cut branch (with 0 coeffs)
     PTDF.write_PTDF(output_path, network_p, ptdf_l, distributed_p, ref_bus_num_p,
@@ -328,6 +329,10 @@ function compute_and_write(network_p, ref_bus_num_p, distributed_p, eps_diag_p, 
                     concat=concat)
 end
 
+"""
+Computes the PTDF for the N case and for all N-1 cases
+NOTE : PTDF can be miscomputed if the network has bridges
+"""
 function compute_and_write_all(network_p, ref_bus_num_p, distributed_p, eps_diag_p, outdir=".")
     compute_and_write(network_p, ref_bus_num_p, distributed_p, eps_diag_p, outdir, nothing, concat=false)
     for (i_cut_branch,_) in network_p.branch_to_i
@@ -352,6 +357,9 @@ function read_non_bridges(dir_path)
     return non_bridges
 end
 
+"""
+    Computes PTDF matrices for the basecase (i.e. N) and for N-1 cases listed in the non-bridges parameter.
+"""
 function compute_and_write(network_p::Network, ref_bus_num_p::Int, distributed_p::Bool, eps_diag_p::Float64,
                         non_bridges::Vector{String},
                         outdir=".")
@@ -365,8 +373,7 @@ end
 
 
 """
-    Computes PTDF matrices for N (ie BASECASE)
-        and for N-1 cases provided by the non-bridges in the file non_bridges.txt of `input_dir`
+    Computes PTDF matrices for N (ie BASECASE) and for N-1 cases provided by the non-bridges in the file non_bridges.txt of `input_dir`
         The non_bridges.txt file should contain the names of the branches to be cut to compute N-1 cases.
 """
 function compute_and_write_n_non_bridges(network_p::Network, ref_bus_num_p::Int, distributed_p::Bool, eps_diag_p::Float64,
