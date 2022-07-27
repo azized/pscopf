@@ -1,6 +1,7 @@
 """
-    main_ptdf
-A main file to generate a PTDF file
+    main_non_bridges
+A main file to check which branches are non-bridges
+i.e. branches whom removal does not result in two non-connected grids
 
 Parameters:
     input_path : path to input data directory describing a grid
@@ -56,10 +57,13 @@ MATPOWER_NETWORKS = [
     ,"case9target"
 ];
 
-function network2graph(network::PTDF.Network)
+function network2graph(network::PTDF.Network)::Tuple{MetaGraph, Set{PTDF.Branch}}
     graph::MetaGraph = MetaGraph(SimpleGraph())
+    parallel_lines::Set{PTDF.Branch} = Set()
 
-    for (_, bus) in sort(network.buses)
+    for i in range(1, length(network.buses))
+        bus = network.buses[i]
+        # vertex i is bus i
         if !add_vertex!(graph, :bus_ref, bus)
             msg_l = @sprintf("error adding vertex of bus %s to the graph", bus.name)
             error(msg_l)
@@ -67,28 +71,44 @@ function network2graph(network::PTDF.Network)
     end
 
     for (_, branch) in network.branches
-        if !add_edge!(graph, branch.from, branch.to, :branch_ref, branch)
-            msg_l = @sprintf("could not add edge of branch %s ie (num_bus1:%d,num_bus2:%d) to the graph. Probably a duplicate edge exists",
-                            branch.name, network.buses[branch.from].id, network.buses[branch.to].id)
-            @warn msg_l
+        if has_edge(graph, branch.from, branch.to) # Undirected graph
+            push!(parallel_lines, branch)
+
+            existing_edge = first(filter_edges(graph,
+                                    (g,e) -> ((src(e)==branch.from && dst(e)==branch.to) || (src(e)==branch.to && dst(e)==branch.from)) ))
+            existing_branch = get_prop(graph, existing_edge, :branch_ref)
+            push!(parallel_lines, existing_branch)
+        else
+            add_edge!(graph, branch.from, branch.to, :branch_ref, branch)
         end
     end
 
-    return graph
+    return graph, parallel_lines
 end
 
-function write_non_bridges(graph::MetaGraph, file_path::String)
+function is_multiline(edge, graph, parallel_lines)::Bool
+    return (get_prop(graph, edge, :branch_ref) in parallel_lines)
+end
+
+function write_non_bridges(graph::MetaGraph, parallel_lines::Set{PTDF.Branch}, file_path::String)
     bridges_l = bridges(graph)
+    # only keep non parallel lines (cause parallel lines cannot be bridges)
+    filter!(e -> !is_multiline(e, graph, parallel_lines), bridges_l)
     @info @sprintf("graph contains %d bridges!", length(bridges_l))
+
+
+    non_bridges::Set{PTDF.Branch} = Set(parallel_lines)
+    for e in edges(graph)
+        if !(e in bridges_l)
+            push!(non_bridges, get_prop(graph, e, :branch_ref))
+        end
+    end
 
     mkpath(dirname(file_path))
     open(file_path, "w") do file
         write(file, @sprintf("#NON_BRIDGES  #nb_bridges=%d\n", length(bridges_l)) )
-        for e in edges(graph)
-            if !(e in bridges_l)
-                edge_name = get_prop(graph, e, :branch_ref).name
-                write(file, edge_name*"\n")
-            end
+        for branch in non_bridges
+            write(file, branch.name*"\n")
         end
     end
 end
@@ -97,10 +117,10 @@ end
 function compute_non_bridges(input_path::String)
     network = PTDF.read_network(input_path)
 
-    graph = network2graph(network)
+    graph, parallel_lines = network2graph(network)
 
     output_path = joinpath(input_path, "non_bridges.txt")
-    write_non_bridges(graph, output_path)
+    write_non_bridges(graph, parallel_lines, output_path)
 end
 
 
