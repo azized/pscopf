@@ -66,7 +66,7 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
             end
         end
 
-        if length(violated_combinations_to_add) >= max_add_per_iter
+        if !isnothing(max_add_per_iter) && (length(violated_combinations_to_add) >= max_add_per_iter)
             break;
         end
     end

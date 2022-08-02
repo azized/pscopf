@@ -12,7 +12,7 @@ const DEFAULT_CONFIGS = (
 
     lol_eps = 1e-04,
 
-    MAX_ADD_RSO_CSTR_PER_ITER = 200,
+    MAX_ADD_RSO_CSTR_PER_ITER = nothing,
     ADD_RSO_CSTR_DYNAMICALLY = false,
     CONSIDER_N_1 = true,
 
