@@ -249,6 +249,10 @@ function has_positive_slack(model_container::TSOBilevelTSOModelContainer)::Bool
     return has_positive_value(model_container.lol_model.p_loss_of_load) #If market cut => TSO localised the LoL
 end
 
+function get_objective_model(bilevel_model::TSOBilevelModel)
+    return get_objective_model(bilevel_model.upper)
+end
+
 function get_upper_obj_expr(bilevel_model::TSOBilevelModel)
     return bilevel_model.upper.objective_model.full_obj_2
 end
@@ -264,6 +268,14 @@ function get_flows(model_container::TSOBilevelModel)
 end
 function get_rso_constraints(model_container::TSOBilevelModel)
     return get_rso_constraints(model_container.upper)
+end
+
+function get_deltas_bounding_constraint(model_container::TSOBilevelModel)::Union{ConstraintRef, Missing}
+    return get_deltas_bounding_constraint(model_container.upper)
+end
+
+function set_deltas_bounding_constraint!(model_container::TSOBilevelModel, cstr::Union{ConstraintRef,Missing})
+    model_container.upper.deltas_bounding_constraint = cstr
 end
 
 ##########################################################
@@ -1032,9 +1044,9 @@ function launch_solve!(bimodel_container::TSOBilevelModel, configs::TSOBilevelCo
 
     #the upper problem's objective model holds the two objective expressions and the deltas expression
     if configs.CONSIDER_DELTAS
-        solve_2steps_deltas!(bimodel_container.upper, configs)
+        solve_2steps_deltas!(bimodel_container, configs)
     else
-        obj = bimodel_container.upper.objective_model.full_obj_2
+        obj = get_objective_model(bimodel_container).full_obj_2 #upper tso model, step2 objective
         @objective(get_model(bimodel_container), Min, obj)
         solve!(bimodel_container, configs.problem_name, configs.out_path)
     end

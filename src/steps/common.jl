@@ -119,6 +119,9 @@ function set_start_values!(model)
     return model
 end
 
+function get_objective_model(model_container::AbstractModelContainer)
+    return model_container.objective_model
+end
 function solve_step1!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
     model_l = get_model(model_container)
 
@@ -127,32 +130,33 @@ function solve_step1!(model_container::AbstractModelContainer, configs::Abstract
     if !ismissing(deltas_cstr)
         delete(model_l, deltas_cstr)
         unregister(model_l, :deltas_cstr)
+        set_deltas_bounding_constraint!(model_container, missing)
     end
 
-    obj = model_container.objective_model.full_obj_1
+    obj = get_objective_model(model_container).full_obj_1
     @objective(model_l, Min, obj)
     solve!(model_container, configs.problem_name*"_step1", configs.out_path)
-    @info "deltas current value : $(value(model_container.objective_model.deltas))"
-    @info "step2 objective current value : $(value(model_container.objective_model.full_obj_2))"
+    @info "deltas current value : $(value(get_objective_model(model_container).deltas))"
+    @info "step2 objective current value : $(value(get_objective_model(model_container).full_obj_2))"
 end
 
 function solve_step2!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
     if (get_status(model_container)!=pscopf_INFEASIBLE
-        && value(model_container.objective_model.deltas)>0 )
+        && value(get_objective_model(model_container).deltas)>0 )
 
         model_l = get_model(model_container)
 
         # before invalidating the model,
-        value_sum_deltas_l = value(model_container.objective_model.deltas)
+        value_sum_deltas_l = value(get_objective_model(model_container).deltas)
         set_start_values!(model_l)
 
         bound_sum_p_deltas!(model_container, value_sum_deltas_l)
 
-        obj = model_container.objective_model.full_obj_2
+        obj = get_objective_model(model_container).full_obj_2
         @objective(model_l, Min, obj)
         solve!(model_container, configs.problem_name*"_step2", configs.out_path)
-        @info "step 1 objective current value (deltas+penalty) : $(value(model_container.objective_model.full_obj_1))"
-        @info "step 1 objective current value (deltas) : $(value(model_container.objective_model.deltas))"
+        @info "step 1 objective current value (deltas+penalty) : $(value(get_objective_model(model_container).full_obj_1))"
+        @info "step 1 objective current value (deltas) : $(value(get_objective_model(model_container).deltas))"
     end
 end
 
@@ -163,9 +167,10 @@ end
 
 function bound_sum_p_deltas!(model_container::AbstractModelContainer, value_sum_deltas::Float64)
     model_l = get_model(model_container)
-    deltas_expr = model_container.objective_model.deltas
+    deltas_expr = get_objective_model(model_container).deltas
 
-    model_container.deltas_bounding_constraint = @constraint(model_l, deltas_expr<=value_sum_deltas)
+    cstr = @constraint(model_l, deltas_expr<=value_sum_deltas)
+    set_deltas_bounding_constraint!(model_container, cstr)
     return model_container
 end
 
@@ -265,6 +270,10 @@ end
 
 function get_deltas_bounding_constraint(model_container::AbstractModelContainer)::Union{ConstraintRef, Missing}
     return model_container.deltas_bounding_constraint
+end
+
+function set_deltas_bounding_constraint!(model_container::AbstractModelContainer, cstr::Union{ConstraintRef,Missing})
+    model_container.deltas_bounding_constraint = cstr
 end
 
 # AbstractGeneratorModel
