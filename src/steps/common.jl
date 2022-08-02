@@ -223,7 +223,11 @@ end
 function solve!(model_container::AbstractModelContainer, problem_name, out_path)
     model_l = get_model(model_container)
 
-    @info problem_name
+    if get_config("FIX_NULL_LOL")
+        freeze_null_lol!(model_container)
+    end
+
+    @info @sprintf("solve!(%s)", problem_name)
     solve!(model_l, problem_name, out_path)
 
     solve_pscopf_status = get_status(model_container)
@@ -1155,6 +1159,16 @@ function local_lol_constraints!(model::AbstractModel, lol_model::AbstractLoLMode
             end
         end
     end
+end
+
+function freeze_null_lol!(model_container::AbstractModelContainer, )
+    @info "fixing LoL to 0."
+
+    lol_dict_vars = has_global_lol(model_container) ? get_global_lol(model_container) : get_local_lol(model_container)
+    lol_vars = values(lol_dict_vars)
+    fix.(lol_vars, 0., force=true) # deletes the variable's original bounds
+
+    return model_container
 end
 
 

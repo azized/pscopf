@@ -11,6 +11,7 @@ const DEFAULT_CONFIGS = (
     market_capping_cost = 1.,
 
     lol_eps = 1e-04,
+    FIX_NULL_LOL = false,
 
     MAX_ADD_RSO_CSTR_PER_ITER = nothing,
     ADD_RSO_CSTR_DYNAMICALLY = false,
