@@ -28,7 +28,7 @@ include(joinpath(root_path, "src", "PSCOPF.jl"));
 # pscopf_ptdf : the ptdf coefficients per (branch, bus_id)
 # pscopf_uncertainties : the nodal injections (for each bus and each limitable)
 instance_path = ( length(ARGS) > 0 ? ARGS[1] :
-                    joinpath(@__DIR__, "..", "usecases-euro-simple", "usecase2-arret-demarrage", "data") )
+                    joinpath(@__DIR__, "..", "usecases-euro-simple", "usecase1-arret-demarrage", "data") )
 
 # output_path is the path where output files will be write_commitment_schedule
 #NOTE: all files in output_path, except those starting with pscopf_, will be deleted
@@ -58,11 +58,7 @@ TS = PSCOPF.create_target_timepoints(ts1) #T: 11h, 11h15, 11h30, 11h45
 # Personalised sequence
 
 sequence1 = PSCOPF.Sequence(Dict([
-    ts1 - Dates.Minute(30)  => [PSCOPF.BalanceMarket(), PSCOPF.TSOInFO()],
-]))
-
-sequence2 = PSCOPF.Sequence(Dict([
-        ts1 - Dates.Minute(30)  => [PSCOPF.TSOBilevel(), PSCOPF.BalanceMarket()],
+        ts1 - Dates.Minute(30)  => [PSCOPF.BalanceMarket(), PSCOPF.TSOBilevel()],
     ]))
 
 PSCOPF.rm_non_prefixed(output_path, "pscopf_")
@@ -71,4 +67,4 @@ exec_context = PSCOPF.PSCOPFContext(network, TS, mode,
                                     uncertainties, nothing,
                                     output_path)
 
-PSCOPF.run!(exec_context, sequence2)
+PSCOPF.run!(exec_context, sequence1)

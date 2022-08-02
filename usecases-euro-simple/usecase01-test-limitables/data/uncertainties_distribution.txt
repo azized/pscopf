@@ -1,0 +1,7 @@
+# id       min_p  max_p    mu     sigma        time_factor
+ENR_2      40     80       60     8            1.
+ENR_1      50     80       65     7            1.
+bus_1      0      0        0      0            1.
+bus_2      0      0        0      0            1.
+bus_3      150    150      150    0            1.
+bus_4      0      0        0      0            1.

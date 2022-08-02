@@ -1,3 +1,0 @@
-#                  branch           limit
-                    branch_1_2         60
-                    branch_2_3        100

@@ -1,0 +1,18 @@
+#             REF_BUS              "bus_3"
+#                case            branch_id               bus_id                 ptdf
+          "BASECASE"         "branch_1_2"              "bus_1"         9.999980E-01
+          "BASECASE"         "branch_1_2"              "bus_2"         0.000000E+00
+          "BASECASE"         "branch_1_2"              "bus_3"         0.000000E+00
+          "BASECASE"         "branch_1_2"              "bus_4"         0.000000E+00
+          "BASECASE"         "branch_2_3"              "bus_1"         4.999984E-01
+          "BASECASE"         "branch_2_3"              "bus_2"         4.999989E-01
+          "BASECASE"         "branch_2_3"              "bus_3"         0.000000E+00
+          "BASECASE"         "branch_2_3"              "bus_4"         2.499993E-01
+          "BASECASE"         "branch_2_4"              "bus_1"         4.999986E-01
+          "BASECASE"         "branch_2_4"              "bus_2"         4.999991E-01
+          "BASECASE"         "branch_2_4"              "bus_3"         0.000000E+00
+          "BASECASE"         "branch_2_4"              "bus_4"        -2.500003E-01
+          "BASECASE"         "branch_3_4"              "bus_1"        -4.999981E-01
+          "BASECASE"         "branch_3_4"              "bus_2"        -4.999986E-01
+          "BASECASE"         "branch_3_4"              "bus_3"         0.000000E+00
+          "BASECASE"         "branch_3_4"              "bus_4"        -7.499989E-01

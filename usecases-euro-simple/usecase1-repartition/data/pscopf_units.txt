@@ -1,3 +1,0 @@
-#                    name            type                   bus_id            minP            maxP           start            prop          dmo(s)           dp(s)
-                    TH_A        Pilotable                    bus_1              40             100             200              20             600             300
-                    TH_B        Pilotable                    bus_3              20              80             400              19             600             300
