@@ -24,6 +24,47 @@ cd(root_path)
 include(joinpath(root_path, "src", "PTDF.jl"));
 
 
+MATPOWER_NETWORKS = [
+    "case4gs",
+    "case5",
+    # "case6ww",
+    "case9",
+    # "case9Q",
+    # "case9target",
+    # "case14",
+    # "case24_ieee_rts",
+    "case30",
+    # "case30pwl",
+    # "case30Q",
+    # "case39",
+    "case57",
+    "case89pegase",
+    "case118",
+    # "case145",
+    # "case300",
+    # "case1354pegase",
+    # "case13659pegase",
+    # "case1888rte",
+    # "case1951rte",
+    # "case2383wp",
+    # "case2736sp",
+    # "case2737sop",
+    # "case2746wop",
+    # "case2746wp",
+    # "case2848rte",
+    # "case2868rte",
+    # "case2869pegase",
+    # "case3012wp",
+    # "case3120sp",
+    # "case3375wp",
+    # "case6468rte",
+    # "case6470rte",
+    # "case6495rte",
+    # "case6515rte",
+    # "case9241pegase",
+];
+
+
 ###############################################
 # Definitions & utils
 ###############################################
@@ -274,6 +315,7 @@ function main_instance_generate(input_path,
                                             nb_generators_probabilities, pilotables_templates)
     gen_init = generate_init_state(initial_network, output_folder)
     PSCOPF.PSCOPFio.write(joinpath(output_folder, "initial_network"), initial_network, ignore_ptdf=true)
+    rm(joinpath(output_folder, "initial_network", PTDF.PTDF_FILENAME), force=true)
     symlink(abspath(out_ptdf_file), joinpath(output_folder, "initial_network", PTDF.PTDF_FILENAME))
     PSCOPF.PSCOPFio.write(joinpath(output_folder, "initial_network"), gen_init)
 
@@ -302,6 +344,7 @@ function main_instance_generate(input_path,
     update_network_limits!(initial_network, free_flows, limit_to_free_flow_ratio)
     generated_network = initial_network
     PSCOPF.PSCOPFio.write(instance_path, generated_network, ignore_ptdf=true)
+    rm(joinpath(instance_path, PTDF.PTDF_FILENAME), force=true)
     symlink(abspath(out_ptdf_file), joinpath(instance_path, PTDF.PTDF_FILENAME))
     PSCOPF.PSCOPFio.write(joinpath(output_folder, "instance"), gen_init)
 
@@ -322,10 +365,10 @@ end
 ###############################################
 Random.seed!(0)
 
-matpower_case = "case5"
-input_path = ( length(ARGS) > 0 ? ARGS[1] :
-                    joinpath(@__DIR__, "..", "data_matpower", matpower_case) )
-output_folder = joinpath(@__DIR__, "..", "data", matpower_case)
+# matpower_case = "case5"
+# input_path = ( length(ARGS) > 0 ? ARGS[1] :
+#                     joinpath(@__DIR__, "..", "data_matpower", matpower_case) )
+# output_folder = joinpath(@__DIR__, "..", "data", matpower_case)
 
 # PTDF
 #######
@@ -370,34 +413,42 @@ prediction_error = 0.01
 #################################################################################################################
 # Launch
 #################################################################################################################
-logfile = PSCOPF.get_config("TEMP_GLOBAL_LOGFILE")
-open(logfile, "a") do file_l
-    write(file_l, "-"^120 * "\n")
-    write(file_l, @sprintf("generation of usecase : %s\n", output_folder))
-    write(file_l, @sprintf("n-1? : %s\n", PSCOPF.get_config("CONSIDER_N_1")))
-end
+# ENV["JULIA_DEBUG"] = PSCOPF
+for matpower_case in ["case4gs"]#MATPOWER_NETWORKS
+    @info matpower_case
+    input_path = ( length(ARGS) > 0 ? ARGS[1] :
+                        joinpath(@__DIR__, "..", "data_matpower", matpower_case) )
+    output_folder = joinpath(@__DIR__, "..", "data", matpower_case)
 
+    logfile = PSCOPF.get_config("TEMP_GLOBAL_LOGFILE")
+    open(logfile, "a") do file_l
+        write(file_l, "-"^120 * "\n")
+        write(file_l, @sprintf("generation of usecase : %s\n", output_folder))
+        write(file_l, @sprintf("n-1? : %s\n", PSCOPF.get_config("CONSIDER_N_1")))
+    end
 
-time_generation = @elapsed (generated_network, gen_init, uncertainties), (time_ptdf, time_free_flows) =
-                            main_instance_generate(input_path,
-                                ref_bus_num, distributed,
-                                default_limit, nb_generators_probabilities, pilotables_templates,
-                                limits_conso_to_unit_capa_ratio,
-                                limit_to_free_flow_ratio,
-                                ECH, ts1, nb_scenarios, prediction_error,
-                                output_folder)
+    time_generation = @elapsed (generated_network, gen_init, uncertainties), (time_ptdf, time_free_flows) =
+                                main_instance_generate(input_path,
+                                    ref_bus_num, distributed,
+                                    default_limit, nb_generators_probabilities, pilotables_templates,
+                                    limits_conso_to_unit_capa_ratio,
+                                    limit_to_free_flow_ratio,
+                                    ECH, ts1, nb_scenarios, prediction_error,
+                                    output_folder)
 
-println("Computing all ptdfs took:", time_ptdf)
-println("Computing free flows took :", time_free_flows)
-println("Generating the whole network instance took :", time_generation)
+    println("Computing all ptdfs took:", time_ptdf)
+    println("Computing free flows took :", time_free_flows)
+    println("Generating the whole network instance took :", time_generation)
 
-println(PSCOPF.TIMER_TRACKS)
+    println(PSCOPF.TIMER_TRACKS)
 
-nb_rso_constraint = PSCOPF.nb_rso_constraint(generated_network, nb_scenarios, 4)
-open(logfile, "a") do file_l
-    write(file_l, @sprintf("nb rso constraints : %d\n", nb_rso_constraint))
-    write(file_l, @sprintf("Computing all ptdfs took: %s\n", time_ptdf))
-    write(file_l, @sprintf("Computing free flows took : %s\n", time_free_flows))
-    write(file_l, @sprintf("Generating the whole network instance took : %s\n", time_generation))
-    write(file_l, @sprintf("TIMES:\n%s\n", PSCOPF.TIMER_TRACKS))
+    nb_rso_constraint = PSCOPF.nb_rso_constraint(generated_network, nb_scenarios, 4)
+    open(logfile, "a") do file_l
+        write(file_l, @sprintf("nb rso constraints : %d\n", nb_rso_constraint))
+        write(file_l, @sprintf("Computing all ptdfs took: %s\n", time_ptdf))
+        write(file_l, @sprintf("Computing free flows took : %s\n", time_free_flows))
+        write(file_l, @sprintf("Generating the whole network instance took : %s\n", time_generation))
+        write(file_l, @sprintf("TIMES:\n%s\n", PSCOPF.TIMER_TRACKS))
+    end
+
 end

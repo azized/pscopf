@@ -42,7 +42,7 @@ end
 # INPUT & PARAMS
 ###############################################
 
-matpower_case = "case5"
+matpower_case = length(ARGS) > 0 ? ARGS[1] : "case5"
 input_path = ( length(ARGS) > 0 ? ARGS[1] :
                     joinpath(@__DIR__, "..", "data_matpower", matpower_case) )
 output_folder = joinpath(@__DIR__, "..", "data", matpower_case)
@@ -55,6 +55,26 @@ TS = PSCOPF.create_target_timepoints(ts1)
 # Launch
 #################################################################################################################
 
+###############################################
+# CONFIGS :
+###############################################
+# Activate dynamic solving
+PSCOPF.set_config!("ADD_RSO_CSTR_DYNAMICALLY", true)
+# LOL sensibility problems
+PSCOPF.set_config!("tso_loss_of_load_penalty_value", 1e6)
+PSCOPF.set_config!("market_loss_of_load_penalty_value", 1e6)
+PSCOPF.set_config!("big_m_value", 2.e6)
+PSCOPF.set_config!("lol_eps", 0.01)
+# LOG options
+PSCOPF.set_config!("LOG_COMBINATIONS", true)
+PSCOPF.set_config!("LOG_NB_CSTRS_FILENAME", joinpath(@__DIR__, "..", "main_nbCSTRS.log"))
+PSCOPF.set_config!("TEMP_GLOBAL_LOGFILE", joinpath(@__DIR__, "..", "main_timingsRSO.log"))
+PSCOPF.init_logging(joinpath(output_folder, "main_launch_1_2.log"))
+
+
+###############################################
+# Read instance
+###############################################
 instance_path = joinpath(output_folder, "instance")
 generated_network = PSCOPF.Data.pscopfdata2network(instance_path)
 uncertainties = PSCOPF.PSCOPFio.read_uncertainties(instance_path)
@@ -68,15 +88,6 @@ open(logfile, "a") do file_l
     write(file_l, @sprintf("n-1? : %s\n", PSCOPF.get_config("CONSIDER_N_1")))
     write(file_l, @sprintf("nb rso constraints : %d\n", PSCOPF.nb_rso_constraint(generated_network, length(PSCOPF.get_scenarios(uncertainties)), length(TS))))
 end
-
-###############################################
-# LOL sensibility problems
-###############################################
-PSCOPF.set_config!("tso_loss_of_load_penalty_value", 1e6)
-PSCOPF.set_config!("market_loss_of_load_penalty_value", 1e6)
-PSCOPF.set_config!("big_m_value", 2.e6)
-PSCOPF.set_config!("ADD_RSO_CSTR_DYNAMICALLY", true)
-PSCOPF.set_config!("LOG_COMBINATIONS", true)
 
 
 ###############################################
@@ -99,10 +110,10 @@ time_mode_1 = @elapsed begin
     end
 end
 
-press_to_continue()
-open(logfile, "a") do file_l
-    write(file_l, "-"^60 * "\n")
-end
+# press_to_continue()
+# open(logfile, "a") do file_l
+#     write(file_l, "-"^60 * "\n")
+# end
 
 
 ###############################################
