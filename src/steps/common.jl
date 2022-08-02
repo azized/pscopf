@@ -106,15 +106,10 @@ Set start values for the model to the solved values in the input model.
 Note :
     The model is no longer optimized, it goes back to a OPTIMIZE_NOT_CALLED state
 """
-function set_start_values!(model)
-    start_values = Dict{VariableRef, Float64}()
-
-    for var in all_variables(model)
-        start_values[var] = value(var)
-    end
-    for (var,val) in start_values
-        set_start_value(var, val)
-    end
+function set_start_values!(model::AbstractModel)
+    vars = all_variables(model)
+    sol_vals = value.(vars)
+    set_start_value.(vars, sol_vals)
 
     return model
 end
@@ -122,6 +117,7 @@ end
 function get_objective_model(model_container::AbstractModelContainer)
     return model_container.objective_model
 end
+
 function solve_step1!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
     model_l = get_model(model_container)
 

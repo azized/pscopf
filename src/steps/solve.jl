@@ -71,6 +71,10 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
         end
     end
 
+    if !isempty(violated_combinations_to_add)
+        set_start_values!(get_model(model_container))
+    end
+
     for (branch, ts, s, network_case) in violated_combinations_to_add
         add_rso_constraint!(get_model(model_container), get_rso_constraints(model_container),
                         get_flows(model_container),
