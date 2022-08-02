@@ -69,7 +69,7 @@ end
 struct EnterFO <: AbstractRunnable
 end
 function run(runnable::EnterFO, ech::Dates.DateTime, firmness, TS::Vector{Dates.DateTime}, context::AbstractContext)
-    println("-----Entrée dans la fenêtre opérationnelle-----")
+    @info("-----Entrée dans la fenêtre opérationnelle-----")
     return nothing #result
 end
 function compute_firmness(runnable::EnterFO,

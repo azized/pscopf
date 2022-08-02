@@ -147,11 +147,11 @@ function compute_flow(network::FC_Network,
 end
 
 function compute_flows(network::FC_Network)
-    @printf("%20s %20s %s\n", "case", "branch", "flow")
+    @info @sprintf("%20s %20s %s\n", "case", "branch", "flow")
     for case in network.network_cases
         for (_,branch) in network.branches
             flow_l = compute_flow(network, branch.name, case)
-            @printf("%20s %20s %f\n", case, branch.name, flow_l)
+            @info @sprintf("%20s %20s %f\n", case, branch.name, flow_l)
         end
     end
 end

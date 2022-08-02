@@ -281,7 +281,7 @@ function tso_out_fo(network::Networks.Network,
                 uncertainties_at_ech, network,
                 get_config("ADD_RSO_CSTR_DYNAMICALLY"))
 
-    @timeit TIMER_TRACKS "logs" log_flows(model_container_l, network, configs.out_path, configs.problem_name)
+    @timeit TIMER_TRACKS "flows.log" log_flows(model_container_l, network, configs.out_path, configs.problem_name)
 
     return model_container_l
 end

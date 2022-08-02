@@ -1023,7 +1023,7 @@ function tso_bilevel(network::Networks.Network,
                 launch_solve!, configs,
                 uncertainties_at_ech, network,
                 get_config("ADD_RSO_CSTR_DYNAMICALLY"))
-    @timeit TIMER_TRACKS "logs" log_flows(bimodel_container_l.upper, network, configs.out_path, configs.problem_name)
+    @timeit TIMER_TRACKS "flows.log" log_flows(bimodel_container_l.upper, network, configs.out_path, configs.problem_name)
 
     return bimodel_container_l
 end

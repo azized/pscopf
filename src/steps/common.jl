@@ -27,7 +27,7 @@ catch e_xpress
         throw(e_xpress)
     end
 end
-println("used optimizer: ", OPTIMIZER)
+@info("used optimizer: ", OPTIMIZER)
 
 """
 Possible status values for a pscopf model container

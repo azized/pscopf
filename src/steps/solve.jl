@@ -26,7 +26,7 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
                                         uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
     did_add_constraints = true
     while(did_add_constraints)
-        @printf("dynamic solve: handling %d constraints out of %d\n",
+        @info @sprintf("dynamic solve: handling %d constraints out of %d\n",
             length(get_rso_constraints(model_container)), length(get_rso_combinations(model_container)))
         solve_fct(model_container, configs)
 
@@ -39,7 +39,7 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
         did_add_constraints = generate_rso_constraints!(model_container, uncertainties_at_ech, network)
     end
 
-    @printf("Dynamically added %d constraints out of %d possible combinations\n",
+    @info @sprintf("Dynamically added %d constraints out of %d possible combinations\n",
             length(get_rso_constraints(model_container)), length(get_rso_combinations(model_container)))
 end
 

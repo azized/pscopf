@@ -260,8 +260,8 @@ function update_schedule_capping!(market_schedule, context, ech, limitable_model
                 capped_by_limitations = compute_capped(uncertainties, limitations, get_network(context), ts, s)
                 capped_by_eod = capped_power - capped_by_limitations
 
-                @printf("capped %f power in scenario %s at ts %s\n", capped_power, s, ts)
-                @printf("capped %f power for eod reasons in scenario %s at ts %s\n", capped_by_eod, s, ts)
+                @info @sprintf("capped %f power in scenario %s at ts %s\n", capped_power, s, ts)
+                @info @sprintf("capped %f power for eod reasons in scenario %s at ts %s\n", capped_by_eod, s, ts)
                 distribution_key = Dict{String,Float64}(gen_id_l => get_capacity(gen_id_l, ts, s,
                                                                                 limitations,
                                                                                 uncertainties)
@@ -296,7 +296,7 @@ function update_schedule_loss_of_load!(market_schedule, context, ech, lol_model:
 
             if total_loss_of_load > 1e-09
             #distribute the cut conso on buses
-                @printf("cut conso %f in scenario %s at ts %s\n", total_loss_of_load, s, ts)
+                @info @sprintf("cut conso %f in scenario %s at ts %s\n", total_loss_of_load, s, ts)
                 distribution_key = Dict{String,Float64}(bus_id_l => get_uncertainties(uncertainties, bus_id_l, ts, s)
                                                         for bus_id_l in bus_ids)
                 distribution_key = normalize_values(distribution_key)
