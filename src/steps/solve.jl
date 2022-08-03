@@ -50,7 +50,8 @@ end
 function generate_rso_constraints!(model_container::AbstractModelContainer,
                                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
     max_add_per_iter = get_config("MAX_ADD_RSO_CSTR_PER_ITER") < 0 ? length(get_rso_combinations(model_container)) : get_config("MAX_ADD_RSO_CSTR_PER_ITER")
-    violated_combinations_to_add = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
+
+    violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
     timed_l = @timed for (branch_id,ts,s,network_case) in get_rso_combinations(model_container)
         # constraint not considered in the model yet
         if !((branch_id,ts,s,network_case) in keys(get_rso_constraints(model_container)))
@@ -66,20 +67,25 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
                                 flow_expr_l,
                                 branch, ts, s, network_case)
                 # store violated combinations to add constraints later, not to invalidate the model now
-                push!(violated_combinations_to_add, (branch, ts, s, network_case) => violation_l)
+                push!(violated_combinations, (branch, ts, s, network_case) => violation_l)
             end
         end
     end
     @info @sprintf("verifying RSO constraint violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+    @info @sprintf("number of violated constraints : %d", length(violated_combinations))
+    has_violations = !isempty(violated_combinations)
 
-    @info @sprintf("number of violated constraints : %d", length(violated_combinations_to_add))
-    @timeit TIMER_TRACKS "sort_violations" sorted_violations = sort(collect(violated_combinations_to_add), by= x -> x[2], rev=true)
+    @timeit TIMER_TRACKS "sort_violations" ( sorted_violations::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}} =
+                        sort(collect(violated_combinations), by= x -> x[2], rev=true) )
+    violated_combinations_to_add = sorted_violations[1: min(max_add_per_iter, length(sorted_violations))]
 
+
+    # set start values for the next iteration before invalidating the model
     if !isempty(violated_combinations_to_add)
         set_start_values!(get_model(model_container))
     end
 
-    @timeit TIMER_TRACKS "add_cstrs" for cnt_l in range(1, min(max_add_per_iter, length(sorted_violations)))
+    @timeit TIMER_TRACKS "add_cstrs" for ((branch, ts, s, network_case) ,_) in violated_combinations_to_add
         (branch, ts, s, network_case) = sorted_violations[cnt_l][1]
 
         add_rso_constraint!(get_model(model_container), get_rso_constraints(model_container),
@@ -87,6 +93,5 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
                         branch, ts, s, network_case)
     end
 
-    has_violations = !isempty(violated_combinations_to_add)
     return has_violations
 end
