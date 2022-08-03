@@ -54,7 +54,7 @@ MATPOWER_NETWORKS = [
     ,"case9target"
 ];
 
-function compute_ptdf(input_path::String)    
+function compute_ptdf(input_path::String, eps_diag_p=1e-6)
     output_path = joinpath(input_path, "pscopf_ptdf.txt")
     ref_bus_num = 1
     distributed = true
@@ -63,7 +63,7 @@ function compute_ptdf(input_path::String)
     # EXECUTION
     #########################
     network = PTDF.read_network(input_path)
-    ptdf = PTDF.compute_ptdf(network, ref_bus_num)
+    ptdf = PTDF.compute_ptdf(network, ref_bus_num, eps_diag_p)
     if distributed
         ptdf = PTDF.distribute_slack(ptdf);
         # coeffs = Dict([ "poste_1_0" => .2,

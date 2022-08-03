@@ -196,13 +196,16 @@ end
 ##################################
 
 function check(branch::Branch)
-    if Networks.get_limit(branch) < 0
-        msg = @sprintf("Branch %s: Invalid input %f : limit must be non-negative.",
-                    Networks.get_id(branch), Networks.get_limit(branch))
-        @error(msg)
-        return false
+    checks = true
+    for (network_case, limit) in Networks.get_limit(branch)
+        if limit < 0
+            msg = @sprintf("Branch %s: Invalid limit %f in network case %s : limit must be non-negative.",
+                        Networks.get_id(branch), limit, network_case)
+            @error(msg)
+            checks = false
+        end
     end
-    return true
+    return checks
 end
 
 
@@ -334,6 +337,7 @@ end
 function check(context)
     #TODO replace & with &&
     check_fo_compatibility(get_network(context), get_fo_length(get_management_mode(context)))
+    check_uncertainties_contains_ech(get_uncertainties(context), get_horizon_timepoints(context))
     return (
         check(get_network(context))
         & check_dmo_compatibility(get_network(context), get_horizon_timepoints(context)[1], get_target_timepoints(context)[1])
@@ -341,7 +345,6 @@ function check(context)
         & check_initial_state(get_generators_initial_state(context), get_network(context))
         & check_target_timepoints(get_target_timepoints(context))
         & check_uncertainties_contain_ts(get_uncertainties(context), get_target_timepoints(context))
-        & check_uncertainties_contains_ech(get_uncertainties(context), get_horizon_timepoints(context))
     )
 end
 

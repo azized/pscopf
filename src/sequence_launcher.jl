@@ -88,16 +88,21 @@ function init!(context_p::AbstractContext, sequence_p::Sequence, check_context::
 end
 
 function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next_ech)
-    println("-"^20)
-    println(typeof(step))
+    @info("-"^20)
+    @info(typeof(step))
+    @debug "firmness .."
     firmness = compute_firmness(step, ech, next_ech,
                             get_target_timepoints(context_p), context_p)
+    @debug "trace .."
     trace_firmness(firmness)
-    result = run(step, ech, firmness,
-                get_target_timepoints(context_p),
-                context_p)
+    @debug "build and run model .."
+    @timeit TIMER_TRACKS "run_model" result = run(step, ech, firmness,
+                                                get_target_timepoints(context_p),
+                                                context_p)
+    log_nb_rso_cstrs(get_config("LOG_NB_CSTRS_FILENAME"), result, context_p.out_dir, ech)
 
     if affects_market_schedule(step)
+    @timeit TIMER_TRACKS "update_schedules" begin
         @debug "update market schedule based on optimization results"
         # old_market_schedule = deepcopy(get_market_schedule(context_p))
         update_market_schedule!(context_p, ech, result, firmness, step)
@@ -106,13 +111,16 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
         #TODO : error if !verify
         verify_firmness(firmness, context_p.market_schedule,
                         excluded_ids=get_limitables_ids(context_p))
+        @debug "trace .."
         PSCOPF.PSCOPFio.write(context_p, get_market_schedule(context_p), "market_")
         PSCOPF.PSCOPFio.write_full(context_p, get_market_schedule(context_p), "market_")
         update_market_flows!(context_p)
         trace_flows(get_market_flows(context_p), get_network(context_p))
     end
+    end
 
     if affects_tso_schedule(step)
+    @timeit TIMER_TRACKS "update_schedules" begin
         @debug "update TSO schedule based on optimization results"
         # old_tso_schedule = deepcopy(get_tso_schedule(context_p))
         update_tso_schedule!(context_p, ech, result, firmness, step)
@@ -121,26 +129,33 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
         #TODO : error if !verify
         verify_firmness(firmness, context_p.tso_schedule,
                         excluded_ids=get_limitables_ids(context_p))
+        @debug "trace .."
         PSCOPF.PSCOPFio.write(context_p, get_tso_schedule(context_p), "tso_")
         PSCOPF.PSCOPFio.write_full(context_p, get_tso_schedule(context_p), "tso_")
         update_tso_flows!(context_p)
         trace_flows(get_tso_flows(context_p), get_network(context_p))
     end
+    end
 
     if affects_tso_actions(step)
+    @timeit TIMER_TRACKS "update_tso_actions" begin
         @debug "update TSO actions based on optimization results"
         update_tso_actions!(context_p,
                             ech, result, firmness, step)
+        @debug "trace .."
         trace_tso_actions(get_tso_actions(context_p))
+    end
     end
     #TODO check coherence between tso schedule and actions
 
     if ( (affects_market_schedule(step) || affects_tso_schedule(step)) )
+    @timeit TIMER_TRACKS "trace_delta_schedules" begin
         schedules_to_delta = sort([get_market_schedule(context_p), get_tso_schedule(context_p)],
                                     by=x->x.decision_time)
-        @printf("changes in %s schedule compared to preceding %s schedule:\n",
+        @info @sprintf("changes in %s schedule compared to preceding %s schedule:\n",
                 schedules_to_delta[2].decider_type, schedules_to_delta[1].decider_type)
         trace_delta_schedules(schedules_to_delta...)
+    end
     end
 
     return result, firmness
@@ -151,14 +166,21 @@ function run!(context_p::AbstractContext, sequence_p::Sequence;
     init!(context_p, sequence_p, check_context)
 
     for (steps_index, (ech, steps_at_ech)) in enumerate(get_operations(sequence_p))
-        println("-"^50)
+        @info("-"^50)
         delta = Dates.value(Dates.Minute(get_target_timepoints(context_p)[1]-ech))
-        println("ECH : ", ech)
-        println("t : M-", delta)
-        println("-"^50)
+        @info @sprintf("ECH : %s", ech)
+        @info @sprintf("t : M-%s", delta)
+        @info("-"^50)
         for step in steps_at_ech
             next_ech = get_next_ech(sequence_p, steps_index, step)
-            run_step!(context_p, step, ech, next_ech)
+            solved_model_container,_ = run_step!(context_p, step, ech, next_ech)
+
+            if !isnothing(solved_model_container) && !(get_status(solved_model_container) in [pscopf_OPTIMAL, pscopf_FEASIBLE])
+                msg_l = @sprintf("Step %s failed : No feasible solutions were found!", step)
+                @error msg_l
+                error(msg_l)
+            end
+
         end
     end
 end
@@ -173,10 +195,11 @@ function get_next_ech(sequence::Sequence, index::Int, decider_step::AbstractRunn
         return nothing
     end
 
-    for ech_l in get_horizon_timepoints(sequence)[index+1:end]
-        for step_l in get_steps(sequence, ech_l)
-            if DeciderType(step_l) == DeciderType(decider_step)
-                return ech_l
+    for future_ech_l in get_horizon_timepoints(sequence)[index+1:end]
+        for future_step_l in get_steps(sequence, future_ech_l)
+            if ( DeciderType(future_step_l) == DeciderType(decider_step)
+                || DeciderType(future_step_l) == Assess() )
+                return future_ech_l
             end
         end
     end
@@ -223,9 +246,9 @@ function trace_flows(flows::SortedDict{Tuple{String, DateTime, String}, Float64}
                     network::Networks.Network)
     for ((branch_id, ts, scenario), flow_val) in flows
         branch = Networks.safeget_branch(network, branch_id)
-        limit = Networks.get_limit(branch)
-        if abs(flow_val) > limit
-            @printf("Flow value %f for branch %s, at timestep %s and scenario %s exceeds branch limit (%f)\n",
+        limit::Float64 = Networks.safeget_limit(branch, Networks.BASECASE)
+        if abs(flow_val) >= limit+1e-09
+            @info @sprintf("Flow value %f for branch %s, at timestep %s and scenario %s exceeds branch limit (%f)\n",
                     flow_val, branch_id, ts, scenario, limit)
         end
     end
@@ -234,9 +257,9 @@ end
 function trace_delta_schedules(old_schedule::Schedule, new_schedule::Schedule)
     print_non_firm_changes = false
 
-    println("Commitment updates :")
+    @info("Commitment updates :")
     trace_delta_schedule_component(old_schedule, new_schedule, get_commitment_sub_schedule, print_non_firm_changes)
-    println("Production updates :")
+    @info("Production updates :")
     trace_delta_schedule_component(old_schedule, new_schedule, get_production_sub_schedule, print_non_firm_changes)
 end
 
@@ -244,7 +267,7 @@ function trace_delta_schedule_component(old_schedule::Schedule, new_schedule::Sc
                                         component_accessor::Function,
                                         print_non_firm_changes=false)
     if !print_non_firm_changes
-        println("(only showing firm changes)")
+        @info("(only showing firm changes)")
     end
     for (gen_id, _) in new_schedule.generator_schedules
         @assert(haskey(old_schedule.generator_schedules, gen_id))
@@ -270,19 +293,19 @@ function trace_delta_genschedule_component(gen_id::String,
 
         if is_definitive(new_uncertain) && is_definitive(old_uncertain)
             if is_different(get_value(new_uncertain), get_value(old_uncertain))
-                @printf("%s\t%s\t%s (%s) --> %s (%s)\n",
+                @info @sprintf("%s\t%s\t%s (%s) --> %s (%s)\n",
                         gen_id, ts, get_value(old_uncertain), old_firmness_msg, get_value(new_uncertain), new_firmness_msg)
             end
 
         elseif is_definitive(new_uncertain) && !is_definitive(old_uncertain)
-            @printf("%s\t%s\t%s (%s)\n",
+            @info @sprintf("%s\t%s\t%s (%s)\n",
                     gen_id, ts, get_value(new_uncertain), new_firmness_msg)
 
         elseif !is_definitive(new_uncertain) && is_definitive(old_uncertain)
-            @printf("%s\t%s\t%s (%s) --> (%s)\n",
+            @info @sprintf("%s\t%s\t%s (%s) --> (%s)\n",
                     gen_id, ts, get_value(old_uncertain), old_firmness_msg, new_firmness_msg)
             if print_non_firm_changes
-                println(new_uncertain.anticipated_value)
+                @info(new_uncertain.anticipated_value)
             end
 
         elseif print_non_firm_changes
@@ -292,7 +315,7 @@ function trace_delta_genschedule_component(gen_id::String,
                 if ( (ismissing(new_val) != ismissing(old_val))
                     || ( !ismissing(old_val) && !ismissing(new_val) && is_different(new_val, old_val) )
                     )
-                    @printf("%s\t%s\t%s\t%s --> %s\n",
+                    @info @sprintf("%s\t%s\t%s\t%s --> %s\n",
                             gen_id, ts, scenario, old_val, new_val)
                 end
             end
@@ -306,14 +329,45 @@ function trace_tso_actions(tso_actions::TSOActions)
     trace_impositions(tso_actions)
 end
 function trace_limitations(tso_actions)
-    println("TSO limitation actions :")
+    @info("TSO limitation actions :")
     for ((gen_id,ts), val_l) in get_limitations(tso_actions)
-        @printf("\t%s at %s : %.2f\n", gen_id, ts, val_l)
+        @info @sprintf("\t%s at %s : %s\n", gen_id, ts, val_l)
     end
 end
 function trace_impositions(tso_actions)
-    println("TSO imposition actions :")
+    @info("TSO imposition actions :")
     for ((gen_id,ts), imposition) in get_impositions(tso_actions)
-        @printf("\t%s at %s : %s\n", gen_id, ts, imposition)
+        @info @sprintf("\t%s at %s : %s\n", gen_id, ts, imposition)
+    end
+end
+
+function log_nb_rso_cstrs(::Any, ::Union{Nothing,AbstractModelContainer}, ::Any, ::Any)
+end
+function log_nb_rso_cstrs(logfile::String,
+                        result::Union{TSOModel, TSOBilevel, TSOBilevelModel, TSOBilevelTSOModelContainer},
+                        outdir::String, ech::DateTime)
+    #TODO : avoid hardcode
+    index = findfirst("pscopf", lowercase(outdir))
+    usecase_name = outdir[(isnothing(index) ? 1 : first(index)) : end]
+    if filesize(logfile) == 0
+        open(logfile, "w") do file_l
+            Base.write(file_l, "#usecase dynamic? model ech status added_rso_cstrs total_rso_cstrs ratio_cstrs LoL\n")
+        end
+    end
+    open(logfile, "a") do file_l
+        considered = length(get_rso_constraints(result))
+        possible = length(get_rso_combinations(result))
+        Base.write(file_l, @sprintf("%s %s %s %s %s %d %d %.3f %s\n",
+                                usecase_name, get_config("ADD_RSO_CSTR_DYNAMICALLY"), typeof(result), ech, get_status(result),
+                                considered, possible, considered/possible, total_lol(result) ))
+    end
+
+    if get_config("LOG_COMBINATIONS")
+        filename_l = valid_filename(joinpath(outdir, @sprintf("combinations_%s.log", ech)))
+        open(filename_l, "w") do file_l
+            for (branch,ts,s,network_case) in keys(get_rso_constraints(result))
+                Base.write(file_l, @sprintf("%s %s %s %s\n", branch, ts, s, network_case))
+            end
+        end
     end
 end

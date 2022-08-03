@@ -1,0 +1,6 @@
+#                 REF_BUS                  unknown
+#                  branch                      bus           value
+               branch_1_2                    bus_1             0.5
+               branch_1_2                    bus_2           -0.25             
+               branch_2_3                    bus_2            0.75
+               branch_2_3                    bus_3           -0.33

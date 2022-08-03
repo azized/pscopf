@@ -11,6 +11,7 @@ Manifest.toml
 #ignored data directories
 
 #log and dbg files
+*pscopf_out*
 default_out
 *.lp
 *.sol
@@ -19,3 +20,5 @@ default_out
 
 #build directories
 /docs/build
+
+*output*

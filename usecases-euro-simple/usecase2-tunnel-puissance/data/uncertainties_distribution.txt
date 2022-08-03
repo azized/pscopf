@@ -1,0 +1,5 @@
+# id       min_p  max_p    mu     sigma        time_factor
+bus_1          0      0     0         0                 1.
+bus_2          0      0     0         0                 1.
+bus_3        200    240   200         0                 1.
+bus_4          0      0     0         0                 1.

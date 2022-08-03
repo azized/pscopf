@@ -1,0 +1,5 @@
+#       case        branch           limit
+        BASECASE    branch_1_2         50
+        BASECASE    branch_1_3         80
+        BASECASE    branch_2_3        160
+        BASECASE    branch_3_4        160

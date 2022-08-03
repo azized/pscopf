@@ -15,11 +15,11 @@ using DataStructures
                         |
     (pilotable) prod_1_1|          load_1
     Pmin=10, Pmax=100   |S1: 30     S1: 50
-    Csta=45k, Cprop=10  |S2: 25     S2: 35
+    Csta=450, Cprop=10  |S2: 25     S2: 35
                         |
     (pilotable) prod_1_2|
      Pmin=10, Pmax=100  |
-     Csta=80k, Cprop=15 |
+     Csta=800, Cprop=15 |
     =#
 
     TS = [DateTime("2015-01-01T11:00:00"), DateTime("2015-01-01T11:15:00")]
@@ -30,12 +30,14 @@ using DataStructures
     # Pilotables
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_1", PSCOPF.Networks.PILOTABLE,
                                             10., 100.,
-                                            45000., 10.,
+                                            450., 10.,
                                             Dates.Second(0), Dates.Second(0))
+    prod_1_1 = PSCOPF.safeget_generator(network, "prod_1_1")
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_2", PSCOPF.Networks.PILOTABLE,
                                             10., 100.,
-                                            80000., 15.,
+                                            800., 15.,
                                             Dates.Second(0), Dates.Second(0))
+    prod_1_2 = PSCOPF.safeget_generator(network, "prod_1_2")
     # Uncertainties
     uncertainties = PSCOPF.Uncertainties()
     PSCOPF.add_uncertainty!(uncertainties, ech, "bus_1", DateTime("2015-01-01T11:00:00"), "S1", 30.)
@@ -228,7 +230,7 @@ using DataStructures
 
         # Solution is optimal
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-        @test 2*45000. ≈ value(result.objective_model.start_cost) # started in 2 scenarios
+        @test 2*PSCOPF.get_start_cost(prod_1_1) ≈ value(result.objective_model.start_cost) # started in 2 scenarios
 
         #start cost for prod_1_1 prefered to prod_1_2
         @test PSCOPF.ON == PSCOPF.get_commitment_value(context.tso_schedule, "prod_1_1", TS[1], "S1")
@@ -292,7 +294,7 @@ using DataStructures
 
         # Solution is optimal
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-        @test 2*80000. ≈ value(result.objective_model.start_cost) # started in 2 scenarios
+        @test 2*PSCOPF.get_start_cost(prod_1_2) ≈ value(result.objective_model.start_cost) # started in 2 scenarios
         @test value(result.objective_model.deltas) < 1e-09 # followed the market
 
         #start cost for prod_1_1 prefered to prod_1_2 but will cause high deviation from the market
@@ -358,7 +360,7 @@ using DataStructures
 
         # Solution is optimal
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-        @test 2*45000. ≈ value(result.objective_model.start_cost) # started in 2 scenarios
+        @test 2*PSCOPF.get_start_cost(prod_1_1) ≈ value(result.objective_model.start_cost) # started in 2 scenarios
         @test (30 + 25 + 50 + 35) ≈ value(result.objective_model.deltas)
 
         #start cost for prod_1_1 prefered to prod_1_2
@@ -545,11 +547,11 @@ using DataStructures
                         |
     (pilotable) prod_1_1|          load_1
     Pmin=10, Pmax=100   |S1: 30     S1: 50
-    Csta=45k, Cprop=10  |S2: 25     S2: 165
+    Csta=450, Cprop=10  |S2: 25     S2: 165
                         |
     (pilotable) prod_1_2|
      Pmin=10, Pmax=100  |
-     Csta=80k, Cprop=15 |
+     Csta=800, Cprop=15 |
 
     We have high demand for TS2, S2
     =#
@@ -686,7 +688,7 @@ using DataStructures
 
         # Solution is optimal
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-        @test (2*45000 + 80000) ≈ value(result.objective_model.start_cost)  # prod1 started in 2 scenarios, prod2 in S2
+        @test (2*450 + PSCOPF.get_start_cost(prod_1_2)) ≈ value(result.objective_model.start_cost)  # prod1 started in 2 scenarios, prod2 in S2
 
         # S1 : prod_1_1 is cheaper to start => used
         @test PSCOPF.ON == PSCOPF.get_commitment_value(context.tso_schedule, "prod_1_1", TS[1], "S1")
@@ -770,7 +772,7 @@ using DataStructures
 
         # Solution is optimal
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-        @test (45000) ≈ value(result.objective_model.start_cost)  # prod1 started in 2 scenarios, prod2 in S2
+        @test (450) ≈ value(result.objective_model.start_cost)  # prod1 started in 2 scenarios, prod2 in S2
         @test( value(result.objective_model.prop_cost) ≈
               (   (0.   *10. + 30. * 15) #TS1, S1
                 + (0.   *10. + 50. * 15) #TS2, S1

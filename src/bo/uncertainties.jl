@@ -2,6 +2,32 @@ using Dates
 using DataStructures
 
 """
+    UncertaintyErrorNDistribution
+
+describes the uncertainty distribution of an injection (load or renewable)
+We consider `ts` as the target timepoint at which the realisation will have place,
+and `ech` is the observation point.
+The farthest we are from ts, the greater is the uncertainty: we assume an increase  by a ratio of `time_factor` for each hour.
+i.e.: factor_l = max{ 0, ( ts - ech )/1h }
+adjusted_sigma = factor_l * error_sigma
+random_injection = mu * (1+ Normal(0.,  adjusted_sigma))
+
+# Arguments
+    - `min_value::Float64` : minimum value that can be assigned to the injection
+    - `max_value::Float64` : maxiimum value that can be assigned to the injection
+    - `mu::Float64` : average injection value
+    - `sigma::Float64` : sigma of the error (0.1 => <=10% of error around mu 70% of the time)
+"""
+struct UncertaintyErrorNDistribution
+    id::String
+    min_value::Float64
+    max_value::Float64
+    mu::Float64
+    error_sigma::Float64
+end
+
+
+"""
     UncertaintyNDistribution
 
 describes the uncertainty distribution of an injection (load or renewable)

@@ -5,7 +5,7 @@ using JuMP
 using Printf
 using Parameters
 
-@with_kw mutable struct EODAssessmentConfigs
+@with_kw mutable struct EODAssessmentConfigs <: AbstractRunnableConfigs
     cut_prod_coeff = 100 #must be greater than LoL coeff in objective
     inj_prod_coeff = 10 #must be greater than LoL coeff in objective
     loss_of_load_coeff = 1 #LoL

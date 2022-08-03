@@ -1,0 +1,4 @@
+#                    name            type                   bus_id            minP            maxP           start            prop          dmo(s)           dp(s)
+                    ENR_1       Limitable                    bus_1               0             100               0               0               0               0
+                    ENR_2       Limitable                    bus_2               0             200               0               0               0               0
+                    TH          Pilotable                    bus_4               0             200               0              10             300             300

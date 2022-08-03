@@ -14,7 +14,7 @@ using DataStructures
                                                 Dates.Second(0), Dates.Second(0)) #dmo, dp : always 0. ?
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "pilotable_1", PSCOPF.Networks.PILOTABLE,
                                                 10., 200., #pmin, pmax
-                                                45000., 30., #start_cost, prop_cost
+                                                450., 30., #start_cost, prop_cost
                                                 Dates.Second(3600), Dates.Second(0)) #dmo, dp
 
     TS = [DateTime("2015-01-01T14:00:00")]

@@ -14,11 +14,11 @@ using DataStructures
                                                 Dates.Second(0), Dates.Second(0)) #dmo, dp : always 0. ?
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "pilotable_1", PSCOPF.Networks.PILOTABLE,
                                                 10., 200., #pmin, pmax
-                                                45000., 30., #start_cost, prop_cost
+                                                450., 20., #start_cost, prop_cost
                                                 Dates.Second(3600), Dates.Second(0)) #dmo, dp
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "pilotable_2", PSCOPF.Networks.PILOTABLE,
                                                 20., 200., #pmin, pmax
-                                                45000., 30., #start_cost, prop_cost
+                                                450., 20., #start_cost, prop_cost
                                                 Dates.Second(3600), Dates.Second(0)) #dmo, dp
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "pilotable_3", PSCOPF.Networks.PILOTABLE,
                                                 0., 200., #pmin, pmax

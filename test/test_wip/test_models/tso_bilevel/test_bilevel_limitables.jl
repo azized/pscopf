@@ -23,15 +23,10 @@ using Printf
                                                 0., 100.,
                                                 0., 1.,
                                                 Dates.Second(0), Dates.Second(0))
-        # PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "wind_2_1", PSCOPF.Networks.LIMITABLE,
-        #                                         0., 100.,
-        #                                         0., 1.,
-        #                                         Dates.Second(0), Dates.Second(0))
 
         # Uncertainties
         uncertainties = PSCOPF.Uncertainties()
         PSCOPF.add_uncertainty!(uncertainties, ech, "wind_1_1", TS[1], "S1", wind_1)
-        # PSCOPF.add_uncertainty!(uncertainties, ech, "wind_2_1", TS[1], "S1", wind_2)
         PSCOPF.add_uncertainty!(uncertainties, ech, "bus_1", TS[1], "S1", load_1)
         PSCOPF.add_uncertainty!(uncertainties, ech, "bus_2", TS[1], "S1", load_2)
 
@@ -420,7 +415,7 @@ using Printf
         @test value(PSCOPF.get_upper_obj_expr(result)) ≈ 30.001 ≈ (5*tso.configs.TSO_LOL_PENALTY + #due to TSO LoL
                                                                     1*tso.configs.TSO_LIMIT_PENALTY +
                                                                     5*tso.configs.TSO_LOL_PENALTY) #due to market LoL
-        @test (5+5e05) == (5*tso.configs.MARKET_CAPPING_COST + 5*tso.configs.MARKET_LOL_PENALTY) ≈ value(PSCOPF.get_lower_obj_expr(result))
+        @test (5*tso.configs.MARKET_CAPPING_COST + 5*tso.configs.MARKET_LOL_PENALTY) ≈ value(PSCOPF.get_lower_obj_expr(result))
     end
 
 end

@@ -47,7 +47,7 @@ L12 = 35.
 
 # # equivalent testcase : EOD_problem_needs_loss_of_load
 # # FAIL : cuts all prod and conso for a cost of 130*e17+40
-# # while a solution of cost 90*1e7 exists
+# # while a solution of cost 90*1e4 exists
 # # adding @constraint(Lower(model), e_st == 0), gives the expected result
 # P1 = 40.
 # D1 = 100.
@@ -56,7 +56,7 @@ L12 = 35.
 
 # # equivalent testcase : RSO_problem
 # # FAIL : cuts all prod and conso for a cost of 50*e17+50
-# # while a solution of cost 5*1e7+5 exists
+# # while a solution of cost 5*1e4+5 exists
 # # adding @constraint(Lower(model), e_st == 5), gives the expected result
 # P1 = 50.
 # D1 = 10.
@@ -84,7 +84,7 @@ L12 = 35.
 
 
 # Upper
-@objective(Upper(model), Min, 1e7*lolmin_st+emin_st)
+@objective(Upper(model), Min, 1e4*lolmin_st+emin_st)
 @constraints(Upper(model), begin
     -35. <= 0.5*penr_n1st +0.5*lol_n1st -0.5*D1 -0.5*lol_n2st +0.5*D2 <= 35. #RSO
     lol_st == lol_n2st + lol_n1st
@@ -102,7 +102,7 @@ L12 = 35.
 end)
 
 # Lower
-@objective(Lower(model), Min, 1e7*lol_st+e_st)
+@objective(Lower(model), Min, 1e4*lol_st+e_st)
 @constraints(Lower(model), begin
     P1-e_st == D1 + D2 - lol_st
     emin_st <= e_st

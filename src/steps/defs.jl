@@ -5,10 +5,12 @@ struct OptimResult end
 struct TSO <: DeciderType end
 struct Market <: DeciderType end
 struct Utilitary <: DeciderType end
+struct Assess <: DeciderType end
 DeciderType(::Type{<:AbstractRunnable}) = Utilitary()
 DeciderType(::Type{<:AbstractTSO}) = TSO()
 DeciderType(::Type{<:AbstractMarket}) = Market()
 DeciderType(::AbstractRunnable) = Utilitary()
+DeciderType(::AbstractAssessment) = Assess()
 DeciderType(::AbstractTSO) = TSO()
 DeciderType(::AbstractMarket) = Market()
 

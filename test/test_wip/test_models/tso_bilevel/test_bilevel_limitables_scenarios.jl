@@ -527,7 +527,7 @@ using Printf
                     => cost : 35
             for market : 15MW capped in S1, 20MW capped in S2
                     cut 15MW consumption in S1 and 20 MW consumption in S2
-                    => cost 35 + 35*1e7
+                    => cost 35 + 35*1e4
     =#
     @testset "limiting_a_scenario_affects_the_other_link_scenarios" begin
 

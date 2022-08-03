@@ -2,19 +2,23 @@ using .Networks
 
 using JuMP
 using Dates
+using MathProgBase
 
 try
     using Xpress;
     global OPTIMIZER = Xpress.Optimizer
+    global OPTIMIZER_NAME = "Xpress"
 catch e_xpress
     if isa(e_xpress, ArgumentError)
         try
             using CPLEX;
             global OPTIMIZER = CPLEX.Optimizer
+            global OPTIMIZER_NAME = "CPLEX"
         catch e_cplex
             if isa(e_cplex, ArgumentError)
                 using Cbc;
                 global OPTIMIZER = Cbc.Optimizer
+                global OPTIMIZER_NAME = "Cbc"
             else
                 throw(e_cplex)
             end
@@ -23,7 +27,7 @@ catch e_xpress
         throw(e_xpress)
     end
 end
-println("used optimizer: ", OPTIMIZER)
+@info("used optimizer: ", OPTIMIZER)
 
 """
 Possible status values for a pscopf model container
@@ -83,44 +87,86 @@ function get_status(model_container_p::AbstractModelContainer)::PSCOPFStatus
     if solver_status_l == MOI.OPTIMIZE_NOT_CALLED
         return pscopf_UNSOLVED
     elseif solver_status_l == MOI.INFEASIBLE
-        @error "model status is infeasible!"
         return pscopf_INFEASIBLE
     elseif solver_status_l == MOI.OPTIMAL
         if has_positive_slack(model_container_p)
-            @warn "model solved optimally but slack variables were used!"
             return pscopf_HAS_SLACK
         else
             return pscopf_OPTIMAL
         end
     else
-        @warn "solver termination status was not optimal : $(solver_status_l)"
         return pscopf_FEASIBLE
     end
 end
 
-function solve_2steps_deltas!(model_container::AbstractModelContainer, configs)
-    obj = model_container.objective_model.full_obj_1
-    @objective(get_model(model_container), Min, obj)
+
+"""
+    set_start_values!(model)
+Set start values for the model to the solved values in the input model.
+Note :
+    The model is no longer optimized, it goes back to a OPTIMIZE_NOT_CALLED state
+"""
+function set_start_values!(model::AbstractModel)
+    vars = all_variables(model)
+    sol_vals = value.(vars)
+    set_start_value.(vars, sol_vals)
+
+    return model
+end
+
+function get_objective_model(model_container::AbstractModelContainer)
+    return model_container.objective_model
+end
+
+function solve_step1!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
+    model_l = get_model(model_container)
+
+    # delete old bound if needed
+    deltas_cstr = get_deltas_bounding_constraint(model_container)
+    if !ismissing(deltas_cstr)
+        delete(model_l, deltas_cstr)
+        unregister(model_l, :deltas_cstr)
+        set_deltas_bounding_constraint!(model_container, missing)
+    end
+
+    obj = get_objective_model(model_container).full_obj_1
+    @objective(model_l, Min, obj)
     solve!(model_container, configs.problem_name*"_step1", configs.out_path)
-    @info "step2 objective current value : $(value(model_container.objective_model.full_obj_2))"
+    @info "deltas current value : $(value(get_objective_model(model_container).deltas))"
+    @info "step2 objective current value : $(value(get_objective_model(model_container).full_obj_2))"
+end
 
+function solve_step2!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
     if (get_status(model_container)!=pscopf_INFEASIBLE
-        && value(model_container.objective_model.deltas)>0 )
-        bound_sum_p_deltas(model_container)
+        && value(get_objective_model(model_container).deltas)>0 )
 
-        obj = model_container.objective_model.full_obj_2
-        @objective(get_model(model_container), Min, obj)
+        model_l = get_model(model_container)
+
+        # before invalidating the model,
+        value_sum_deltas_l = value(get_objective_model(model_container).deltas)
+        set_start_values!(model_l)
+
+        bound_sum_p_deltas!(model_container, value_sum_deltas_l)
+
+        obj = get_objective_model(model_container).full_obj_2
+        @objective(model_l, Min, obj)
         solve!(model_container, configs.problem_name*"_step2", configs.out_path)
-        @info "step 1 objective current value (deltas) : $(value(model_container.objective_model.full_obj_1))"
+        @info "step 1 objective current value (deltas+penalty) : $(value(get_objective_model(model_container).full_obj_1))"
+        @info "step 1 objective current value (deltas) : $(value(get_objective_model(model_container).deltas))"
     end
 end
 
-function bound_sum_p_deltas(model_container::AbstractModelContainer)
-    model_l = get_model(model_container)
-    deltas_expr = model_container.objective_model.deltas
-    value_sum_deltas = value(deltas_expr)
+function solve_2steps_deltas!(model_container::AbstractModelContainer, configs::AbstractRunnableConfigs)
+    solve_step1!(model_container, configs)
+    solve_step2!(model_container, configs)
+end
 
-    @constraint(model_l, deltas_expr<=value_sum_deltas)
+function bound_sum_p_deltas!(model_container::AbstractModelContainer, value_sum_deltas::Float64)
+    model_l = get_model(model_container)
+    deltas_expr = get_objective_model(model_container).deltas
+
+    cstr = @constraint(model_l, deltas_expr<=value_sum_deltas)
+    set_deltas_bounding_constraint!(model_container, cstr)
     return model_container
 end
 
@@ -128,7 +174,7 @@ end
 function solve!(model::AbstractModel,
                 problem_name="problem", out_folder=nothing,
                 optimizer=OPTIMIZER)
-    problem_name_l = replace(problem_name, ":"=>"_")
+    problem_name_l = valid_filename(problem_name)
     set_optimizer(model, optimizer);
 
     if !isnothing(out_folder)
@@ -136,13 +182,30 @@ function solve!(model::AbstractModel,
         model_file_l = joinpath(out_folder, problem_name_l*".lp")
         write_to_file(model, model_file_l)
 
+        if get_config("SOLVER_LP_FILES")
+
+            model_file_l_new = joinpath(out_folder, problem_name_l*"_new.lp")
+
+            MOI.Utilities.attach_optimizer(model)
+            internalModel = unsafe_backend(model)
+            if OPTIMIZER_NAME == "Xpress"
+                Xpress.writeprob(internalModel.inner, model_file_l_new, "-l");
+            elseif OPTIMIZER_NAME == "CPLEX"
+                CPLEX.CPXwriteprob(internalModel.env, internalModel.lp, model_file_l_new, "lp")
+            end
+
+        end
+
         log_file_l = joinpath(out_folder, problem_name_l*".log")
     else
         log_file_l = devnull
     end
 
-    set_time_limit_sec(model, PSCOPF_TIME_LIMIT_IN_SECONDS)
-    if PSCOPF_REDIRECT_LOG
+    time_limit_l = get_config("PSCOPF_TIME_LIMIT_IN_SECONDS")
+    if !isnothing(time_limit_l)
+        set_time_limit_sec(model, time_limit_l)
+    end
+    if get_config("PSCOPF_REDIRECT_LOG")
         redirect_to_file(log_file_l) do
             optimize!(model)
         end
@@ -156,23 +219,62 @@ end
 function solve!(model_container::AbstractModelContainer, problem_name, out_path)
     model_l = get_model(model_container)
 
-    @info problem_name
+    if get_config("FIX_NULL_LOL")
+        freeze_null_lol!(model_container)
+    end
+
+    @info @sprintf("solve!(%s)", problem_name)
     solve!(model_l, problem_name, out_path)
-    @info "pscopf model status: $(get_status(model_container))"
+
+    solve_pscopf_status = get_status(model_container)
+    @info "pscopf model solve time: $(solve_time(model_l))"
+    @info "pscopf model status: $(solve_pscopf_status)"
     @info "Termination status : $(termination_status(model_l))"
     @info "Objective value : $(objective_value(model_l))"
+    if solve_pscopf_status == pscopf_UNSOLVED
+        @error "Model not solved!"
+    elseif solve_pscopf_status == pscopf_INFEASIBLE
+        @error "model status is infeasible!"
+    elseif solve_pscopf_status == pscopf_HAS_SLACK
+        @warn "model solved optimally but slack variables were used!"
+    end
+
+    total_lol_l = total_lol(model_container)
+    if !isnothing(total_lol_l)
+        @info @sprintf("LoL = %.10f", total_lol_l)
+    end
 
     return model_container
+end
+
+function write_solution(filename, model)
+    open(filename, "w") do file_l
+        for var in all_variables(model)
+            Base.write(file_l, @sprintf("%60s = %f\n", name(var), value(var)))
+        end
+    end
 end
 
 function has_positive_slack(model_container)::Bool
     error("unimplemented")
 end
 
+function has_global_lol(model_container::AbstractModelContainer)
+    return hasproperty(model_container.lol_model, :p_global_loss_of_load)
+end
+
 function requires_linking(firmness::DecisionFirmness, do_link::Bool=false)::Bool
     return do_link || (firmness in [DECIDED, TO_DECIDE])
 end
 
+
+function get_deltas_bounding_constraint(model_container::AbstractModelContainer)::Union{ConstraintRef, Missing}
+    return model_container.deltas_bounding_constraint
+end
+
+function set_deltas_bounding_constraint!(model_container::AbstractModelContainer, cstr::Union{ConstraintRef,Missing})
+    model_container.deltas_bounding_constraint = cstr
+end
 
 # AbstractGeneratorModel
 ############################
@@ -948,14 +1050,20 @@ end
 function get_global_lol(lol_model::AbstractLoLModel)
     return lol_model.p_global_loss_of_load
 end
+function get_global_lol(model_container::AbstractModelContainer)
+    return get_global_lol(model_container.lol_model)
+end
 
 function get_local_lol(lol_model::AbstractLoLModel)
     return lol_model.p_loss_of_load
 end
 
+function get_local_lol(model_container::AbstractModelContainer)
+    return get_local_lol(model_container.lol_model)
+end
+
 function has_positive_value(dict_vars::AbstractDict{T,V}) where T where V <: AbstractVariableRef
-    return any(e -> value(e[2]) > 1e-09, dict_vars)
-    #e.g. 1e-15 is supposed to be 0.
+    return any(e -> value(e[2]) > get_config("lol_eps"), dict_vars)
 end
 
 function add_lol_vars!(model_container::AbstractModelContainer, target_timepoints, scenarios,
@@ -983,6 +1091,14 @@ function add_global_lol_vars!(model::AbstractModel, lol_model::AbstractLoLModel,
             name =  @sprintf("%sP_global_lol[%s,%s]", prefix, ts, s)
             get_global_lol(lol_model)[ts, s] = @variable(model, base_name=name, lower_bound=0.)
         end
+    end
+end
+
+function total_lol(model_container::AbstractModelContainer)
+    if has_global_lol(model_container)
+        sum( value(lol_var) for (_,lol_var) in get_global_lol(model_container) )
+    else
+        sum( value(lol_var) for (_,lol_var) in get_local_lol(model_container) )
     end
 end
 
@@ -1041,6 +1157,16 @@ function local_lol_constraints!(model::AbstractModel, lol_model::AbstractLoLMode
     end
 end
 
+function freeze_null_lol!(model_container::AbstractModelContainer, )
+    @info "fixing LoL to 0."
+
+    lol_dict_vars = has_global_lol(model_container) ? get_global_lol(model_container) : get_local_lol(model_container)
+    lol_vars = values(lol_dict_vars)
+    fix.(lol_vars, 0., force=true) # deletes the variable's original bounds
+
+    return model_container
+end
+
 
 # Objective
 ##################
@@ -1083,7 +1209,7 @@ function add_coeffxsum_cost!(obj_component::AffExpr,
 end
 
 
-# Constraints
+# EOD Constraints
 ##################
 
 
@@ -1134,27 +1260,66 @@ function eod_constraints!(model::AbstractModel, eod_constraints::SortedDict{Tupl
     end
 end
 
-function add_rso_flows_exprs(flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
-                pilotable_model::AbstractPilotableModel,
-                limitable_model::AbstractLimitableModel,
-                lol_model::AbstractLoLModel,
-                combinations_to_consider, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
-                uncertainties_at_ech, network::Networks.Network)
-    for (branch_id, ts, s, ptdf_case) in combinations_to_consider
-        branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
-        add_rso_flow_expr!(flows,
-                        pilotable_model, limitable_model, lol_model,
-                        branch, ts, s, ptdf_case,
-                        uncertainties_at_ech, network)
+
+# RSO Constraints
+##################
+
+
+"""
+    returns the RSO combinations (i.e. branch,ts,s,network_case) to be considered
+# Note
+    Not all combinations have corresponding constraints and flows in the model_container!
+"""
+function get_rso_combinations(model_container::AbstractModelContainer)
+    return model_container.rso_combinations
+end
+function get_flows(model_container::AbstractModelContainer)
+    return model_container.flows
+end
+function get_rso_constraints(model_container::AbstractModelContainer)
+    return model_container.rso_constraints
+end
+
+function add_rso_combinations!(rso_combinations::Vector{Tuple{String,Dates.DateTime,String,String}},
+                            consider_all,
+                            network, target_timepoints, scenarios)
+    if consider_all
+        append!(rso_combinations, all_combinations(network, target_timepoints, scenarios))
+    else
+        append!(rso_combinations, basecase_combinations(network, target_timepoints, scenarios))
     end
 end
-function add_rso_flow_expr!(flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
-                    pilotable_model::AbstractPilotableModel,
-                    limitable_model::AbstractLimitableModel,
-                    lol_model::AbstractLoLModel,
+
+function add_rso_flows_exprs!(model_container::AbstractModelContainer,
+                combinations_to_add, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
+                uncertainties_at_ech, network::Networks.Network)
+    for (branch_id, ts, s, ptdf_case) in combinations_to_add
+        branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
+        flow_expr_l = flow_expr(model_container,
+                                branch, ts, s, ptdf_case,
+                                uncertainties_at_ech, network)
+        add_rso_flow_expr!(model_container, flow_expr_l,
+                        branch, ts, s, ptdf_case)
+    end
+end
+
+function add_rso_flow_expr!(model_container::AbstractModelContainer,
+                flow_expr::AffExpr,
+                branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String)
+    flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr} = get_flows(model_container)
+    branch_id = Networks.get_id(branch)
+    flows[branch_id, ts, s, ptdf_case] = flow_expr
+end
+
+function flow_expr(model_container::AbstractModelContainer,
                     branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
                     uncertainties_at_ech, network::Networks.Network)
     branch_id = Networks.get_id(branch)
+
+    flow_l = get(get_flows(model_container), (branch_id, ts, s, ptdf_case), missing)
+    if !ismissing(flow_l)
+        return flow_l
+    end
 
     flow_l = AffExpr()
     for bus in Networks.get_buses(network)
@@ -1164,61 +1329,63 @@ function add_rso_flow_expr!(flows::SortedDict{Tuple{String,Dates.DateTime,String
         # + injections limitables
         for gen in Networks.get_generators_of_type(bus, Networks.LIMITABLE)
             gen_id = Networks.get_id(gen)
-            var_p_injected = get_p_injected(limitable_model)[gen_id, ts, s]
-            flow_l += ptdf * var_p_injected
+            var_p_injected = get_p_injected(model_container, Networks.LIMITABLE)[gen_id, ts, s]
+            add_to_expression!(flow_l, ptdf*var_p_injected)
         end
 
         # + injections pilotables
         for gen in Networks.get_generators_of_type(bus, Networks.PILOTABLE)
             gen_id = Networks.get_id(gen)
-            var_p_injected = get_p_injected(pilotable_model)[gen_id, ts, s]
-            flow_l += ptdf * var_p_injected
+            var_p_injected = get_p_injected(model_container, Networks.PILOTABLE)[gen_id, ts, s]
+            add_to_expression!(flow_l, ptdf*var_p_injected)
         end
 
         # - loads
-        flow_l -= ptdf * get_uncertainties(uncertainties_at_ech, bus_id, ts, s)
+        add_to_expression!(flow_l, -ptdf * get_uncertainties(uncertainties_at_ech, bus_id, ts, s))
 
         # + cutting loads ~ injections
-        flow_l += ptdf * get_local_lol(lol_model)[bus_id, ts, s]
+        add_to_expression!(flow_l, ptdf * get_local_lol(model_container)[bus_id, ts, s])
     end
 
-    flows[branch_id, ts, s, ptdf_case] = flow_l
     return flow_l
 end
 
-function rso_constraints!(model::AbstractModel,
-                          rso_constraints::SortedDict{Tuple{String,Dates.DateTime,String,String}, ConstraintRef},
-                        flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
-                        combinations_to_consider, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
+function add_rso_constraints!(model_container::AbstractModelContainer,
+                        combinations_to_add, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
                         network::Networks.Network;
                         prefix::String="")
-    for (branch_id, ts, s, ptdf_case) in combinations_to_consider
+    model = get_model(model_container)
+    rso_constraints = get_rso_constraints(model_container)
+    flows = get_flows(model_container)
+    for (branch_id, ts, s, ptdf_case) in combinations_to_add
         branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
-        rso_constraint!(model, rso_constraints,
+        add_rso_constraint!(model, rso_constraints,
                         flows,
                         branch, ts, s, ptdf_case,
                         prefix=prefix)
     end
 end
-function rso_constraint!(model::AbstractModel,
-                         rso_constraints::SortedDict{Tuple{String,Dates.DateTime,String,String}, ConstraintRef},
-                        flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
-                        branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String;
-                        prefix::String="")
+
+function add_rso_constraint!(model::AbstractModel,
+                             rso_constraints::SortedDict{Tuple{String,Dates.DateTime,String,String}, Tuple{ConstraintRef,ConstraintRef}},
+                            flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr},
+                            branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String;
+                            prefix::String="")
 
     branch_id = Networks.get_id(branch)
-    flow_limit_l = Networks.get_limit(branch)
+    flow_limit_l = Networks.safeget_limit(branch, ptdf_case)
+    flow_expr_l = flows[branch_id, ts, s, ptdf_case]
 
-    c_name =  @sprintf("%sRSO[%s,%s,%s,%s]", prefix, branch_id, ts, s, ptdf_case)
-    flow_l = flows[branch_id, ts, s, ptdf_case]
-    rso_constraints[branch_id, ts, s, ptdf_case] = @constraint(model, -flow_limit_l <= flow_l <= flow_limit_l, base_name=c_name)
-
+    c_name_lb =  @sprintf("%sRSO[%s,%s,%s,%s]_lb", prefix, branch_id, ts, s, ptdf_case)
+    c_name_ub =  @sprintf("%sRSO[%s,%s,%s,%s]_ub", prefix, branch_id, ts, s, ptdf_case)
+    rso_constraints[branch_id, ts, s, ptdf_case] = (@constraint(model, -flow_limit_l <= flow_expr_l , base_name=c_name_lb),
+                                                    @constraint(model, flow_expr_l <= flow_limit_l , base_name=c_name_ub))
 end
 
 # Helpers
 ##################
 
-function all_n_combinations(network, target_timepoints, scenarios)
+function basecase_combinations(network, target_timepoints, scenarios)
     return [(branch_id,ts,s,Networks.BASECASE)
                 for branch_id in map(Networks.get_id, Networks.get_branches(network))
                 for ts in target_timepoints
@@ -1233,6 +1400,53 @@ function all_combinations(network, target_timepoints, scenarios)
                 for s in scenarios
                 for case in Networks.get_cases(network) #if the network does not hold the PTDF data for a case it will be ignored
             ]
+end
+
+"""
+# Note
+    The number of active constraints is not exact since, in a MIP context,
+     some constraints that have non-negative slack might be influential/active
+"""
+function log_flows(model_container,network,out_folder,filename)
+    filename_l = valid_filename(filename)
+    flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr} = get_flows(model_container)
+    if !isnothing(out_folder)
+        log_file_l = joinpath(out_folder, filename_l*"_flows.log")
+        open(log_file_l, "w") do file_l
+            line_l = @sprintf("branch_id  %15s  s  ptdf_case  flow_value flow_limit\n", "ts")
+            @debug line_l
+            write(file_l, line_l)
+            for ((branch_id, ts, s, ptdf_case), flow_expr) in sort_by_cut_branch(flows)
+                flow_val = value(flow_expr)
+                flow_lim = Networks.safeget_limit(get_branch(network, branch_id), ptdf_case)
+                status = (abs(flow_val) >= flow_lim-1e-09) ? "ACTIVE" : "INACTIVE"
+                line_l = @sprintf("%s %s %s %s %s %s %s\n",
+                                branch_id, ts, s, ptdf_case, flow_val, flow_lim, status)
+                write(file_l, line_l)
+                @debug line_l
+            end
+        end
+    end
+
+    if get_config("CNT_ACTIVE_RSO_CSTRS")
+        @warn "This section is time consuming deactivate it with : set_config!(\"CNT_ACTIVE_RSO_CSTRS\", false)"
+
+        nb_potential_cstrs = length(get_rso_combinations(model_container)) # lb <= flow <= ub counts as one constraint
+        nb_active_cstrs = 0
+        for (_, (cstr_lb,cstr_ub)) in get_rso_constraints(model_container)
+            if !has_slack(cstr_lb) || !has_slack(cstr_ub)
+                nb_active_cstrs += 1
+            end
+        end
+
+        msg_l = @sprintf("at least %d/%d RSO constraints are active!", nb_active_cstrs, nb_potential_cstrs)
+        @info msg_l
+        open(get_config("TEMP_GLOBAL_LOGFILE"), "a") do file_l write(file_l, msg_l*"\n") end
+    end
+end
+
+function sort_by_cut_branch(flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr})
+    sort(collect(flows), by= x -> (x[1][4], x[1][1:3]...))
 end
 
 
@@ -1477,5 +1691,10 @@ function compute_lb(expr::AffExpr, default_lb=nothing)
     end
 
     return expr_ub
+end
+
+function has_slack(cstr::ConstraintRef, eps=1e-09)
+    has_slack_l = (normalized_rhs(cstr) - value(cstr)) >= eps
+    return has_slack_l
 end
 

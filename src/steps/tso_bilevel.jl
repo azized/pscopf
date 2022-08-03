@@ -97,10 +97,12 @@ function update_tso_actions!(context::AbstractContext, ech, result, firmness,
             if ( get_power_level_firmness(firmness, gen_id, ts) in [TO_DECIDE, DECIDED]
                 || runnable.configs.LINK_SCENARIOS_LIMIT )
                 @assert( value(p_limit_var) ≈ get!(limitations, (gen_id, ts), value(p_limit_var)) ) #TODELETE : checks that all values are the same across scenarios
-                set_limitation_value!(tso_actions, gen_id, ts, value(p_limit_var))
+                add_missing_scenarios(get_limitation_uncertain_value!(tso_actions, gen_id, ts), get_scenarios(context))
+                set_limitation_definitive_value!(tso_actions, gen_id, ts, value(p_limit_var))
             else
                 #FIXME : may encounter problems if runnable.configs.LINK_SCENARIOS_LIMIT==false, cause limitations are supposed firm
                 @warn "FIXME? : need to fix limitation actions to a by scenario before DP"
+                set_limitation_value!(tso_actions, gen_id, ts, s, value(p_limit_var))
             end
         #else : will remain missing
         end
@@ -114,9 +116,10 @@ function update_tso_actions!(context::AbstractContext, ech, result, firmness,
 
         if get_power_level_firmness(firmness, gen_id, ts) in [TO_DECIDE, DECIDED]
             @assert( value(p_injected_var) ≈ get!(impositions, (gen_id, ts), value(p_injected_var)) ) #TODELETE : checks that all values are the same across scenarios
-            set_imposition_value!(tso_actions, gen_id, ts, s, value(p_injected_var), value(p_injected_var))
+            set_imposition_value!(tso_actions, gen_id, ts, s, value(p_min_var), value(p_max_var))
         else
             set_imposition_value!(tso_actions, gen_id, ts, s, value(p_min_var), value(p_max_var))
+
         end
     end
 

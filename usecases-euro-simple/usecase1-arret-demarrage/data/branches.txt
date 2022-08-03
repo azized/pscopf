@@ -1,0 +1,5 @@
+#branch_name branch_num bus_from bus_to r(pu)       x(pu)
+branch_1_2            1        1      2     1           1
+branch_2_3            2        2      3     1           2
+branch_2_4            3        2      4     1           1
+branch_3_4            4        3      4     1           1

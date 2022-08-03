@@ -32,22 +32,22 @@ using DataStructures
                                |                      |
         ccg_1------------------|                      |----ccg_2
            150, 600            |                      |       100, 600
-           45k, 30             |                      |       50k, 20
+           450, 10             |                      |       50k, 20
             4h, 15mins         |                      |        4h, 15mins
                                |                      |
                                |                      |
         tac_1------------------|                      |
             10, 300            |                      |
-           12k, 100            |                      |
+           120, 20             |                      |
         30mins, 15mins         |                      |
                                |                      |
 
     =#
-    @testset "example_small_usecase" begin
+    @testset "example_small_usecase_with_reserves_units" begin
         out_path = joinpath(@__DIR__, "..", "..", "default_out", "example_small_usecase")
         rm(out_path, recursive=true, force=true)
 
-        ECH = [DateTime("2015-01-01T07:00:00"), DateTime("2015-01-01T07:30:00"),DateTime("2015-01-01T10:00:00")]
+        ECH = [DateTime("2015-01-01T07:00:00"), DateTime("2015-01-01T07:30:00"),DateTime("2015-01-01T10:00:00"),DateTime("2015-01-01T11:00:00")]
         TS = [DateTime("2015-01-01T11:00:00"), DateTime("2015-01-01T11:30:00")]
 
         network = PSCOPF.Networks.Network()
@@ -62,25 +62,33 @@ using DataStructures
         #Generators - Limitables
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "wind_1", PSCOPF.Networks.LIMITABLE,
                                                 0., 200.,
-                                                0., 10.,
+                                                0., 1.,
                                                 Dates.Second(15*60), Dates.Second(15*60)) #dmo, dp : always 0. ?
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "wind_2", PSCOPF.Networks.LIMITABLE,
                                                 0., 200.,
-                                                0., 11.,
+                                                0., 2.,
                                                 Dates.Second(15*60), Dates.Second(15*60))
         #Generators - Pilotables
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "ccg_1", PSCOPF.Networks.PILOTABLE,
                                                 150., 600., #pmin, pmax
-                                                45000., 30., #start_cost, prop_cost
+                                                450., 10., #start_cost, prop_cost
                                                 Dates.Second(4*3600), Dates.Second(15*60)) #dmo, dp
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "tac_1", PSCOPF.Networks.PILOTABLE,
                                                 10., 300.,
-                                                12000., 100.,
+                                                120., 20.,
                                                 Dates.Second(30*60), Dates.Second(15*60))
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "ccg_2", PSCOPF.Networks.PILOTABLE,
                                                 100., 600., #pmin, pmax
-                                                50000., 20., #start_cost, prop_cost
+                                                500., 20., #start_cost, prop_cost
                                                 Dates.Second(4*3600), Dates.Second(15*60)) #dmo, dp
+        PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "reserve_1", PSCOPF.Networks.PILOTABLE,
+                                                0., 600., #pmin, pmax
+                                                0., 500., #start_cost, prop_cost
+                                                Dates.Second(0*3600), Dates.Second(0*60)) #dmo, dp
+        PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "reserve_2", PSCOPF.Networks.PILOTABLE,
+                                                0., 600., #pmin, pmax
+                                                0., 500., #start_cost, prop_cost
+                                                Dates.Second(0*3600), Dates.Second(0*60)) #dmo, dp
 
         uncertainties = PSCOPF.Uncertainties()
         PSCOPF.add_uncertainty!(uncertainties, ECH[1], "bus_1", TS[1], "S1", 610.)
@@ -179,22 +187,21 @@ using DataStructures
         #Limitables
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "wind_1_0", PSCOPF.Networks.LIMITABLE,
                                                 0., 0., #pmin, pmax : Not concerned ? min is always 0, max is the limitation
-                                                0., 10., #start_cost, prop_cost : start cost is always 0 ?
+                                                0., 1., #start_cost, prop_cost : start cost is always 0 ?
                                                 Dates.Second(0), Dates.Second(0)) #dmo, dp : always 0. ?
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "wind_2_0", PSCOPF.Networks.LIMITABLE,
                                                 0., 0.,
-                                                0., 11.,
+                                                0., 2.,
                                                 Dates.Second(0), Dates.Second(0))
         #Pilotables
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "ccg_1_0", PSCOPF.Networks.PILOTABLE,
                                                 10., 200., #pmin, pmax
-                                                45000., 30., #start_cost, prop_cost
+                                                450., 10., #start_cost, prop_cost
                                                 Dates.Second(4*3600), Dates.Second(15*60)) #dmo, dp
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "tac_2_0", PSCOPF.Networks.PILOTABLE,
                                                 10., 200.,
-                                                12000., 120.,
+                                                120., 20.,
                                                 Dates.Second(30*60), Dates.Second(15*60))
-
         # initial generators state
         generators_init_state = SortedDict(
                         "ccg_1_0" => PSCOPF.ON,

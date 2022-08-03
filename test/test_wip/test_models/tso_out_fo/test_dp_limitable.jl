@@ -61,7 +61,7 @@ using DataStructures
 
         #This limit should be ignored because firmness is FREE
         OLD_LIMIT = 55.
-        PSCOPF.set_limitation_value!(context.tso_actions, "wind_1_1", TS[1], OLD_LIMIT)
+        PSCOPF.set_limitation_definitive_value!(context.tso_actions, "wind_1_1", TS[1], OLD_LIMIT)
 
         context.tso_schedule = PSCOPF.Schedule(PSCOPF.TSO(), Dates.DateTime("2015-01-01T06:00:00"), SortedDict(
                                             "wind_1_1" => PSCOPF.GeneratorSchedule("wind_1_1",
@@ -138,7 +138,7 @@ using DataStructures
                                         uncertainties, nothing)
 
         OLD_LIMIT = 55.
-        PSCOPF.set_limitation_value!(context.tso_actions, "wind_1_1", TS[1], OLD_LIMIT)
+        PSCOPF.set_limitation_definitive_value!(context.tso_actions, "wind_1_1", TS[1], OLD_LIMIT)
 
         context.tso_schedule = PSCOPF.Schedule(PSCOPF.TSO(), Dates.DateTime("2015-01-01T10:40:00"), SortedDict(
                                             "wind_1_1" => PSCOPF.GeneratorSchedule("wind_1_1",
@@ -214,7 +214,7 @@ using DataStructures
                                         uncertainties, nothing)
 
         OLD_LIMIT = 70.
-        PSCOPF.set_limitation_value!(context.tso_actions, "wind_1_1", TS[1], OLD_LIMIT)
+        PSCOPF.set_limitation_definitive_value!(context.tso_actions, "wind_1_1", TS[1], OLD_LIMIT)
 
         context.tso_schedule = PSCOPF.Schedule(PSCOPF.TSO(), Dates.DateTime("2015-01-01T10:40:00"), SortedDict(
                                             "wind_1_1" => PSCOPF.GeneratorSchedule("wind_1_1",

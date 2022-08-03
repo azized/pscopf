@@ -16,7 +16,45 @@ cd(root_path)
 include(joinpath(root_path, "src", "PTDF.jl"));
 
 
-
+MATPOWER_NETWORKS = [
+    "case4gs",
+    "case5",
+    "case6ww",
+    "case9",
+    "case9Q",
+    "case9target",
+    "case14",
+    "case24_ieee_rts",
+    "case30",
+    "case30pwl",
+    "case30Q",
+    "case39",
+    "case57",
+    "case89pegase",
+    "case118",
+    "case145",
+    "case300",
+    # "case1354pegase",
+    # "case13659pegase",
+    # "case1888rte",
+    # "case1951rte",
+    # "case2383wp",
+    # "case2736sp",
+    # "case2737sop",
+    # "case2746wop",
+    # "case2746wp",
+    # "case2848rte",
+    # "case2868rte",
+    # "case2869pegase",
+    # "case3012wp",
+    # "case3120sp",
+    # "case3375wp",
+    # "case6468rte",
+    # "case6470rte",
+    # "case6495rte",
+    # "case6515rte",
+    # "case9241pegase",
+];
 
 #########################
 # INPUT & PARAMS
@@ -26,36 +64,21 @@ input_path = ( length(ARGS) > 0 ? ARGS[1] :
                     joinpath(@__DIR__, "..", "data", "ptdf", "3buses_3branches") )
 ref_bus_num = 1
 distributed = true
-
-
-function compute(network_p, ref_bus_num_p, distributed_p, i_cut_branch_p=nothing)
-    if isnothing(i_cut_branch_p)
-        network_l = network_p
-        name = ""
-    else
-        cut_branch_l, network_l = PTDF.reduced_network(network_p, i_cut_branch_p)
-        name = "_n1_"*cut_branch_l.name
-    end
-
-    ptdf_l = PTDF.compute_ptdf(network_l, ref_bus_num_p)
-    if distributed_p
-        ptdf_l = PTDF.distribute_slack(ptdf_l);
-        # coeffs = Dict([ "poste_1_0" => .2,
-        #                 "poste_2_0" => .8])
-        # ptdf_l = PTDF.distribute_slack(ptdf_l, coeffs, network_l);
-    end
-    filename = @sprintf("pscopf_ptdf%s.txt", name)
-    output_path = joinpath(input_path, filename)
-    #use original network to print full ptdf containing the cut branch (with 0 coeffs)
-    PTDF.write_PTDF(output_path, network_p, ptdf_l, distributed_p, ref_bus_num_p, i_cut_branch_p)
-end
+eps_diag = 1e-3
 
 #########################
 # EXECUTION
 #########################
-network = PTDF.read_network(input_path)
+function main(input_path, ref_bus_num, distributed, eps_diag)
+    network = PTDF.read_network(input_path)
+    out_path = input_path
+    PTDF.compute_and_write_n_non_bridges(network, ref_bus_num, distributed, eps_diag, input_path, out_path)
+end
 
-compute(network, ref_bus_num, distributed)
-for (i_cut_branch,_) in network.branch_to_i
-    compute(network, ref_bus_num, distributed, i_cut_branch)
+# main(input_path, ref_bus_num, distributed, eps_diag)
+
+for matpower_case in MATPOWER_NETWORKS
+    @info matpower_case
+    matpower_path = joinpath(@__DIR__, "..", "data_matpower", matpower_case)
+    main(matpower_path, ref_bus_num, distributed, eps_diag)
 end

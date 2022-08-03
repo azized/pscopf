@@ -44,8 +44,8 @@ function add_new_bus!(network::Network, bus_id::String)
     network.buses[bus_id] = bus
 end
 
-function add_new_buses!(network::Network, buses_id::Vector{String})
-    for bus_id in buses_id
+function add_new_buses!(network::Network, buses_ids)
+    for bus_id in buses_ids
         add_new_bus!(network, bus_id)
     end
 end
@@ -85,14 +85,36 @@ function get_buses(network::Network)
     return collect(values(network.buses))
 end
 
+function get_nb_buses(network::Network)::Int
+    return length(network.buses)
+end
+
 ############
 ## Branch ##
 ############
 
-function add_new_branch!(network::Network, id_branch::String, limit::Float64)
+function add_new_branch!(network::Network, id_branch::String, limit::Float64)::Branch
     try
         branch = Branch(id_branch, limit)
         network.branches[id_branch] = branch
+    catch
+        rethrow()
+    end
+end
+
+function add_new_branch!(network::Network, id_branch::String, limits::SortedDict{String,Float64})::Branch
+    try
+        branch = Branch(id_branch, limits)
+        network.branches[id_branch] = branch
+    catch
+        rethrow()
+    end
+end
+
+function add_new_limit!(network::Network, id_branch::String, network_case::String, limit::Float64)
+    try
+        branch = safeget_branch(network, id_branch)
+        add_limit!(branch, network_case, limit)
     catch
         rethrow()
     end

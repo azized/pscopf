@@ -20,14 +20,16 @@ using Dates
 
     @testset "definitive_value" begin
         tso_actions = PSCOPF.TSOActions()
-        PSCOPF.set_limitation_value!(tso_actions, "lim_1", ts, 300.)
-        PSCOPF.set_limitation_value!(tso_actions, "lim_2", ts, 90.)
+        PSCOPF.set_limitation_definitive_value!(tso_actions, "lim_1", ts, 300.)
+        PSCOPF.set_limitation_value!(tso_actions, "lim_2", ts, "S1", 91.)
+        PSCOPF.set_limitation_value!(tso_actions, "lim_2", ts, "S2", 92.)
         PSCOPF.set_imposition_value!(tso_actions, "imp", ts, "S1", 2., 10.)
         PSCOPF.set_imposition_value!(tso_actions, "imp", ts2, "S1", 55., 55.)
 
         @test length( PSCOPF.get_limitations(tso_actions) ) == 2
         @test PSCOPF.get_limitation(tso_actions, "lim_1", ts) == 300.
-        @test PSCOPF.get_limitation(tso_actions, "lim_2", ts) == 90.
+        @test PSCOPF.get_limitation(tso_actions, "lim_2", ts, "S1") == 91.
+        @test PSCOPF.get_limitation(tso_actions, "lim_2", ts, "S2") == 92.
 
         @test length( PSCOPF.get_impositions(tso_actions) ) == 2
         @test PSCOPF.get_imposition(tso_actions, "imp", ts, "S1") == (2., 10.)

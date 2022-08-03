@@ -1,0 +1,4 @@
+# name          bus    inject
+prod_1          bus_1  100
+prod_2          bus_2  100
+prod_4          bus_4  0

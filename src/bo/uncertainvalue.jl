@@ -16,6 +16,12 @@ function UncertainValue{T}(scenarios::Vector{String}) where T
     return UncertainValue{T}(missing, antcipated_values)
 end
 
+function add_missing_scenarios(uncertain_value::UncertainValue{T}, scenarios) where T
+    for scenario in scenarios
+        get!(uncertain_value.anticipated_value, scenario, missing)
+    end
+end
+
 function get_scenarios(uncertain_value::UncertainValue{T}) where T
     return keys(uncertain_value.anticipated_value)
 end
@@ -116,7 +122,7 @@ function Base.show(io::IO, uncertain_value::UncertainValue{T}) where T
     scenarios = get_scenarios(uncertain_value)
     if is_definitive(uncertain_value)
         @printf(io, "definitive value %s for scenarios %s",
-                get_value(uncertain_value), scenarios)
+                get_value(uncertain_value), collect(scenarios))
     else
         for s in scenarios
             @printf(io, "%s:%s,", s, get_value(uncertain_value, s))

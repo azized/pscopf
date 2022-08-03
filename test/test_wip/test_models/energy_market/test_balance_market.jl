@@ -24,7 +24,7 @@ using DataStructures
                         |                      |
     (pilotable) prod_1_1|                      |(pilotable) prod_2_1
     Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-    Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+    Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
     ON                  |                      | ON
                         |                      |
            load(bus_1)  |                      |load(bus_2)
@@ -45,11 +45,11 @@ using DataStructures
         # Pilotables
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_1", PSCOPF.Networks.PILOTABLE,
                                                 10., 100.,
-                                                45000., 10.,
+                                                450., 10.,
                                                 Dates.Second(0), Dates.Second(0))
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "prod_2_1", PSCOPF.Networks.PILOTABLE,
                                                 10., 100.,
-                                                80000., 15.,
+                                                800., 15.,
                                                 Dates.Second(0), Dates.Second(0))
         # initial generators state
         generators_init_state = SortedDict(
@@ -72,7 +72,7 @@ using DataStructures
 
         tso_actions_l = PSCOPF.get_tso_actions(context)
         if !ismissing(limit_1)
-            PSCOPF.set_limitation_value!(tso_actions_l, "wind_1_1", TS[1], limit_1)
+            PSCOPF.set_limitation_definitive_value!(tso_actions_l, "wind_1_1", TS[1], limit_1)
         end
         if !ismissing(impos_1_s1)
             PSCOPF.set_imposition_value!(tso_actions_l, "prod_1_1", TS[1], "S1", impos_1_s1[1], impos_1_s1[2])
@@ -117,7 +117,7 @@ using DataStructures
                         |                      |
     (pilotable) prod_1_1|                      |(pilotable) prod_2_1
     Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-    Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+    Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
     ON                  |                      | ON
                         |                      |
         load(bus_1)     |                      |load(bus_2)
@@ -168,7 +168,7 @@ using DataStructures
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-        Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+        Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
         ON                  |                      | ON
                             |                      |
             load(bus_1)     |                      |load(bus_2)
@@ -217,7 +217,7 @@ using DataStructures
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-        Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+        Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
         ON                  |                      | ON
                             |                      |
             load(bus_1)     |                      |load(bus_2)
@@ -274,7 +274,7 @@ using DataStructures
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-        Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+        Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
         ON                  |                      | ON
                             |                      |
             load(bus_1)     |                      |load(bus_2)
@@ -341,7 +341,7 @@ using DataStructures
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-        Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+        Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
         ON                  |                      | ON
                             |                      |
             load(bus_1)     |                      |load(bus_2)
@@ -408,7 +408,7 @@ using DataStructures
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-        Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+        Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
         ON                  |                      | ON
                             |                      |
             load(bus_1)     |                      |load(bus_2)

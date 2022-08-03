@@ -26,11 +26,11 @@ using Printf
         # Pilotables
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_1", PSCOPF.Networks.PILOTABLE,
                                                 20., 200.,
-                                                10000., 10.,
+                                                100., 10.,
                                                 Dates.Second(4*60*60), Dates.Second(15*60))
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "prod_2_1", PSCOPF.Networks.PILOTABLE,
                                                 20., 200.,
-                                                50000., 50.,
+                                                500., 50.,
                                                 Dates.Second(1*60*60), Dates.Second(15*60))
 
         # Uncertainties
@@ -83,14 +83,14 @@ using Printf
                         bus 1                   bus 2
                             |                      |
         (limitable) wind_1_1|       "1_2"          |
-        Pmin=0, Pmax=200    |                      |
-        Csta=0, Cprop=1     |                      |
+        Pmin=20, Pmax=200   |                      |
+        Csta=100, Cprop=10  |                      |
         S1: 85              |----------------------|
                             |         35           |
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=20, Pmax=200   |                      | Pmin=20, Pmax=200
-        Csta=10k, Cprop=10  |                      | Csta=50k, Cprop=50
+        Csta=500, Cprop=50  |                      | Csta=50k, Cprop=50
         OFF->ON             |                      | OFF->OFF
                             |                      |
                load(bus_1)  |                      |load(bus_2)
@@ -115,14 +115,14 @@ using Printf
                         bus 1                   bus 2
                             |                      |
         (limitable) wind_1_1|       "1_2"          |
-        Pmin=0, Pmax=200    |                      |
-        Csta=0, Cprop=1     |                      |
+        Pmin=20, Pmax=200   |                      |
+        Csta=100, Cprop=10  |                      |
         S1: 85              |----------------------|
                             |         35           |
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=20, Pmax=200   |                      | Pmin=20, Pmax=200
-        Csta=10k, Cprop=10  |                      | Csta=50k, Cprop=50
+        Csta=500, Cprop=50  |                      | Csta=50k, Cprop=50
         OFF->ON             |                      | OFF->OFF
                             |                      |
                load(bus_1)  |                      |load(bus_2)
@@ -210,14 +210,14 @@ using Printf
                         bus 1                   bus 2
                             |                      |
         (limitable) wind_1_1|       "1_2"          |
-        Pmin=0, Pmax=200    |                      |
-        Csta=0, Cprop=1     |                      |
+        Pmin=20, Pmax=200   |                      |
+        Csta=100, Cprop=10  |                      |
         S1: 85              |----------------------|
                             |         35           |
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=20, Pmax=200   |                      | Pmin=20, Pmax=200
-        Csta=10k, Cprop=10  |                      | Csta=50k, Cprop=50
+        Csta=500, Cprop=50  |                      | Csta=50k, Cprop=50
         OFF->ON             |                      | OFF->OFF
                             |                      |
                load(bus_1)  |                      |load(bus_2)
@@ -286,7 +286,7 @@ using Printf
                 @test 35. ≈ PSCOPF.get_prod_value(context.tso_schedule, "prod_2_1", TS[1], "S1")
 
                 #no limitation #Note : even if there was, they would only appear for units that reached the DP
-                @test 65. ≈ PSCOPF.get_limitation(context.tso_actions, "wind_1_1", TS[1])
+                @test 65. ≈ PSCOPF.get_limitation(context.tso_actions, "wind_1_1", TS[1],"S1")
                 #impositions only appear at DP
                 @test !isempty(PSCOPF.get_impositions(context.tso_actions))
                 @test 20. ≈ PSCOPF.get_imposition(context.tso_actions, "prod_1_1", TS[1], "S1")[1]

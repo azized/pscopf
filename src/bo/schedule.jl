@@ -388,7 +388,7 @@ function set_prod_definitive_value!(sub_schedule::GeneratorSchedule, ts::Dates.D
                         sub_schedule.gen_id, ts)
         throw( error(msg) )
     end
-    safeset_definitive_value!(uncertain_value, value)
+    set_definitive_value!(uncertain_value, value)
 end
 function set_prod_definitive_value!(schedule, gen_id::String, ts::Dates.DateTime, value::Float64)
     return set_prod_definitive_value!(schedule.generator_schedules[gen_id], ts, value)

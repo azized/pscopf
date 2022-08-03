@@ -14,19 +14,10 @@ OUTPUT_PREFIX = "pscopf_out_"
 #   Readers
 ##########################
 
-function read_buses!(network::Network, data::String)
-    buses_ids = Set{String}();
-    open(joinpath(data, "pscopf_ptdf.txt"), "r") do file
-        for ln in eachline(file)
-            # don't read commentted line
-            if ln[1] != '#'
-                buffer = PSCOPF.split_with_space(ln);
-                push!(buses_ids, buffer[2])
-            end
-        end
-    end
 
-    open(joinpath(data, "pscopf_units.txt"), "r") do file
+function read_buses_from_ptdf(data_folder::String)::Set{String}
+    buses_ids = Set{String}();
+    open(joinpath(data_folder, "pscopf_ptdf.txt"), "r") do file
         for ln in eachline(file)
             # don't read commentted line
             if ln[1] != '#'
@@ -35,38 +26,77 @@ function read_buses!(network::Network, data::String)
             end
         end
     end
+    return buses_ids
+end
 
-    Networks.add_new_buses!(network, collect(buses_ids));
+function read_buses_from_units(data_folder::String)::Set{String}
+    buses_ids = Set{String}();
+    open(joinpath(data_folder, "pscopf_units.txt"), "r") do file
+        for ln in eachline(file)
+            # don't read commentted line
+            if ln[1] != '#'
+                buffer = PSCOPF.split_with_space(ln);
+                push!(buses_ids, buffer[3])
+            end
+        end
+    end
+    return buses_ids
+end
+
+function read_buses!(network::Network, data::String)
+    buses_ids::Set{String} = union(
+        read_buses_from_ptdf(data),
+        read_buses_from_units(data)
+    )
+    Networks.add_new_buses!(network, buses_ids);
+end
+
+
+function read_branches_from_ptdf(data_folder::String, default_limit=0.)::Dict{String, Networks.Limits}
+    branches = Dict{String, Networks.Limits}();
+    open(joinpath(data_folder, "pscopf_ptdf.txt"), "r") do file
+        for ln in eachline(file)
+            # don't read commentted line
+            if ln[1] != '#'
+                buffer = PSCOPF.split_with_space(ln);
+                network_case = buffer[1]
+                branch_id = buffer[2]
+                limits_l = get!(branches, branch_id, Networks.Limits())
+                push!(limits_l, network_case => default_limit)
+            end
+        end
+    end
+    return branches
+end
+
+function read_branches_from_limits(data_folder::String)::Dict{String, Networks.Limits}
+    branches = Dict{String, Networks.Limits}();
+    open(joinpath(data_folder, "pscopf_limits.txt"), "r") do file
+        for ln in eachline(file)
+            # don't read commentted line
+            if ln[1] != '#'
+                buffer = PSCOPF.split_with_space(ln);
+                network_case = buffer[1]
+                branch_id = buffer[2]
+                limit = parse(Float64, buffer[3]);
+                limits_l = get!(branches, branch_id, Networks.Limits())
+                push!(limits_l, network_case => limit)
+            end
+        end
+    end
+    return branches
 end
 
 function read_branches!(network::Network, data::String)
-    branches = Dict{String,Float64}();
     default_limit = 0.
-    open(joinpath(data, "pscopf_ptdf.txt"), "r") do file
-        for ln in eachline(file)
-            # don't read commentted line
-            if ln[1] != '#'
-                buffer = PSCOPF.split_with_space(ln);
-                branch_id = buffer[1]
-                push!(branches, branch_id => default_limit)
-            end
-        end
-    end
+    # merge order is important to prioritise limits data!
+    branches::Dict{String, Networks.Limits} = merge(
+        read_branches_from_ptdf(data, default_limit),
+        read_branches_from_limits(data)
+    )
 
-    open(joinpath(data, "pscopf_limits.txt"), "r") do file
-        for ln in eachline(file)
-            # don't read commentted line
-            if ln[1] != '#'
-                buffer = PSCOPF.split_with_space(ln);
-                branch_id = buffer[1]
-                limit = parse(Float64, buffer[2]);
-                push!(branches, branch_id=>limit)
-            end
-        end
-    end
-
-    for (id,limit) in branches
-        Networks.add_new_branch!(network, id, limit);
+    for (id,limits) in branches
+        Networks.add_new_branch!(network, id, limits);
     end
 end
 
@@ -76,10 +106,11 @@ function read_ptdf!(network::Network, data::String, filename="pscopf_ptdf.txt")
             # don't read commentted line
             if ln[1] != '#'
                 buffer = PSCOPF.split_with_space(ln);
-                branch_id = buffer[1]
-                bus_id = buffer[2]
-                ptdf_value = parse(Float64, buffer[3])
-                Networks.add_ptdf_elt!(network, branch_id, bus_id, ptdf_value)
+                ptdf_case = buffer[1]
+                branch_id = buffer[2]
+                bus_id = buffer[3]
+                ptdf_value = parse(Float64, buffer[4])
+                Networks.add_ptdf_elt!(network, branch_id, bus_id, ptdf_value, ptdf_case)
             end
         end
     end
@@ -174,7 +205,8 @@ end
 #   Writers
 ##########################
 
-function write(dir_path::String, network::Networks.Network)
+function write(dir_path::String, network::Networks.Network;
+            ignore_units=false, ignore_limits=false, ignore_ptdf=false)
     mkpath(dir_path)
     # if !isdir(dir_path)
     #     mkpath(dir_path)
@@ -183,11 +215,17 @@ function write(dir_path::String, network::Networks.Network)
     #     error(msg)
     # end
     #units
-    write(dir_path, network.generators)
+    if !ignore_units
+        write(dir_path, network.generators)
+    end
     #limits
-    write(dir_path, network.branches)
+    if !ignore_limits
+        write(dir_path, network.branches)
+    end
     #ptdf
-    write(dir_path, network.ptdf)
+    if !ignore_ptdf
+        write(dir_path, network.ptdf)
+    end
 end
 
 function write(dir_path::String, generators::SortedDict{String, Networks.Generator})
@@ -215,31 +253,37 @@ end
 function write(dir_path::String, branches::SortedDict{String, Networks.Branch})
     output_file_l = joinpath(dir_path, "pscopf_limits.txt")
     open(output_file_l, "w") do file_l
-        Base.write(file_l, @sprintf("#%24s%16s\n", "branch", "limit"))
-        for (id_l, branch_l) in branches
-            Base.write(file_l, @sprintf("%25s%16.8E\n",
-                                    Networks.get_id(branch_l),
-                                    Networks.get_limit(branch_l)
-                                    )
-                    )
+        Base.write(file_l, @sprintf("#%24s %25s %16s\n", "network_case", "branch", "limit"))
+        for (_, branch_l) in branches
+            for (network_case_l, limit_l) in Networks.get_limit(branch_l)
+                Base.write(file_l, @sprintf("%25s %25s %16.8E\n",
+                                        network_case_l,
+                                        Networks.get_id(branch_l),
+                                        limit_l
+                                        )
+                        )
+            end
         end
     end
 end
 
 
-function write(dir_path::String, ptdf::SortedDict{String,SortedDict{String, Float64}})
+function write(dir_path::String, ptdf_dict::Networks.PTDFDict)
     output_file_l = joinpath(dir_path, "pscopf_ptdf.txt")
     open(output_file_l, "w") do file_l
-        Base.write(file_l, @sprintf("#%24s%16s\n", "REF_BUS", "unknown"))
-        Base.write(file_l, @sprintf("#%24s%25s%16s\n", "branch", "bus", "value"))
-        for (branch_id_l, _) in ptdf
-            for (bus_id_l, val_l) in ptdf[branch_id_l]
-                Base.write(file_l, @sprintf("%25s%25s%16.8E\n",
-                                        branch_id_l,
-                                        bus_id_l,
-                                        val_l
-                                        )
-                            )
+        Base.write(file_l, @sprintf("#%24s %16s\n", "REF_BUS", "unknown"))
+        Base.write(file_l, @sprintf("#%24s %25s %25s %16s\n", "case", "branch", "bus", "value"))
+        for (case_l, ptdf) in ptdf_dict
+            for (branch_id_l, _) in ptdf
+                for (bus_id_l, val_l) in ptdf[branch_id_l]
+                    Base.write(file_l, @sprintf("%24s %25s %25s %16.8E\n",
+                                            case_l,
+                                            branch_id_l,
+                                            bus_id_l,
+                                            val_l
+                                            )
+                                )
+                end
             end
         end
     end

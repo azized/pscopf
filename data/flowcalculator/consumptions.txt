@@ -1,0 +1,4 @@
+# name                 bus      conso
+conso_poste_1_0      poste_1_0  100
+conso_poste_2_0      poste_2_0  260
+conso_poste_3_0      poste_3_0  101

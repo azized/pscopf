@@ -38,7 +38,7 @@ end
                         |                      |
     (pilotable) prod_1_1|                      |(pilotable) prod_2_1
     Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-    Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+    Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
 INIT: ON                |                      |INIT: ON
                         |                      | DP=DMO=2h
                         |                      |
@@ -68,11 +68,11 @@ function context_2buses_2TS_2S(TS, ech;
     # Pilotables
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_1", PSCOPF.Networks.PILOTABLE,
                                             10., 100.,
-                                            45000., 10.,
+                                            450., 10.,
                                             Dates.Second(0), Dates.Second(0))
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "prod_2_1", PSCOPF.Networks.PILOTABLE,
                                             10., 100.,
-                                            80000., 15.,
+                                            800., 15.,
                                             Dates.Second(2*60*60), Dates.Second(2*60*60))
     # initial generators state
     generators_init_state = SortedDict(

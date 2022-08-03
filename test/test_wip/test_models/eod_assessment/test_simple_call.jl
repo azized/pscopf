@@ -44,7 +44,7 @@ using Printf
 
         PSCOPF.set_imposition_definitive_value!(PSCOPF.get_tso_actions(context), "prod_1_1", TS[1], impositions_1[1], impositions_1[2])
         PSCOPF.set_imposition_definitive_value!(PSCOPF.get_tso_actions(context), "prod_2_1", TS[1], impositions_2[1], impositions_2[2])
-        PSCOPF.set_limitation_value!(PSCOPF.get_tso_actions(context), "wind_1_1", TS[1], limit_1)
+        PSCOPF.set_limitation_definitive_value!(PSCOPF.get_tso_actions(context), "wind_1_1", TS[1], limit_1)
 
 
         return context

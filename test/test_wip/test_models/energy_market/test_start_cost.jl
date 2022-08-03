@@ -7,6 +7,7 @@ using DataStructures
 
 @testset verbose=true "test_energy_market_start_cost" begin
 
+    LOL_COST = 1e5
 
     #=
     TS: [11h, 11h15]
@@ -15,11 +16,11 @@ using DataStructures
                         |
     (pilotable) prod_1_1|          load_1
     Pmin=10, Pmax=100   |S1: 30     S1: 50
-    Csta=45k, Cprop=10  |S2: 25     S2: 35
+    Csta=4.5k, Cprop=10 |S2: 25     S2: 35
                         |
     (pilotable) prod_1_2|
      Pmin=10, Pmax=100  |
-     Csta=80k, Cprop=15 |
+     Csta=8k, Cprop=15  |
     =#
 
     TS = [DateTime("2015-01-01T11:00:00"), DateTime("2015-01-01T11:15:00")]
@@ -30,12 +31,14 @@ using DataStructures
     # Pilotables
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_1", PSCOPF.Networks.PILOTABLE,
                                             10., 100.,
-                                            45000., 10.,
+                                            4500., 10.,
                                             Dates.Second(0), Dates.Second(0))
+    prod_1_1 = PSCOPF.safeget_generator(network, "prod_1_1")
     PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_2", PSCOPF.Networks.PILOTABLE,
                                             10., 100.,
-                                            80000., 15.,
+                                            8000., 15.,
                                             Dates.Second(0), Dates.Second(0))
+    prod_1_2 = PSCOPF.safeget_generator(network, "prod_1_2")
     # Uncertainties
     uncertainties = PSCOPF.Uncertainties()
     PSCOPF.add_uncertainty!(uncertainties, ech, "bus_1", DateTime("2015-01-01T11:00:00"), "S1", 30.)
@@ -59,6 +62,7 @@ using DataStructures
     We only use prod_1_1 cause its prop cost is lower
     =#
     @testset "energy_market_no_starting_cost_if_units_initially_started" begin
+
         # initial generators state
         generators_init_state = SortedDict(
             "prod_1_1" => PSCOPF.ON,
@@ -67,7 +71,7 @@ using DataStructures
         context = PSCOPF.PSCOPFContext(network, TS, PSCOPF.PSCOPF_MODE_1,
                                         generators_init_state,
                                         uncertainties, nothing)
-        market = PSCOPF.EnergyMarket()
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST))
         result = PSCOPF.run(market, ech, firmness,
                     PSCOPF.get_target_timepoints(context),
                     context)
@@ -101,7 +105,7 @@ using DataStructures
         context = PSCOPF.PSCOPFContext(network, TS, PSCOPF.PSCOPF_MODE_1,
                                         generators_init_state,
                                         uncertainties, nothing)
-        market = PSCOPF.EnergyMarket()
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST))
         result = PSCOPF.run(market, ech, firmness,
                     PSCOPF.get_target_timepoints(context),
                     context)
@@ -135,7 +139,7 @@ using DataStructures
         context = PSCOPF.PSCOPFContext(network, TS, PSCOPF.PSCOPF_MODE_1,
                                         generators_init_state,
                                         uncertainties, nothing)
-        market = PSCOPF.EnergyMarket()
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST))
         result = PSCOPF.run(market, ech, firmness,
                     PSCOPF.get_target_timepoints(context),
                     context)
@@ -143,7 +147,9 @@ using DataStructures
 
         # Solution is optimal
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-        @test 2*45000. ≈ value(result.objective_model.start_cost) # started in 2 scenarios
+        @test 2*PSCOPF.get_start_cost(prod_1_1) ≈ value(result.objective_model.start_cost) # started in 2 scenarios
+
+        @assert PSCOPF.get_start_cost(prod_1_1) < PSCOPF.get_start_cost(prod_1_2)
 
         #start cost for prod_1_1 prefered to prod_1_2
         @test PSCOPF.ON == PSCOPF.get_commitment_value(context.market_schedule, "prod_1_1", TS[1], "S1")
@@ -164,11 +170,11 @@ using DataStructures
                         |
     (pilotable) prod_1_1|          load_1
     Pmin=10, Pmax=100   |S1: 30     S1: 50
-    Csta=45k, Cprop=10  |S2: 25     S2: 165
+    Csta=4.5k, Cprop=10 |S2: 25     S2: 165
                         |
     (pilotable) prod_1_2|
      Pmin=10, Pmax=100  |
-     Csta=80k, Cprop=15 |
+     Csta=8k, Cprop=15  |
 
     We have high demand for TS2, S2
     =#
@@ -192,7 +198,7 @@ using DataStructures
         context = PSCOPF.PSCOPFContext(network, TS, PSCOPF.PSCOPF_MODE_1,
                                         generators_init_state,
                                         uncertainties, nothing)
-        market = PSCOPF.EnergyMarket()
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST))
         result = PSCOPF.run(market, ech, firmness,
                     PSCOPF.get_target_timepoints(context),
                     context)
@@ -240,7 +246,7 @@ using DataStructures
         context = PSCOPF.PSCOPFContext(network, TS, PSCOPF.PSCOPF_MODE_1,
                                         generators_init_state,
                                         uncertainties, nothing)
-        market = PSCOPF.EnergyMarket()
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST))
         result = PSCOPF.run(market, ech, firmness,
                     PSCOPF.get_target_timepoints(context),
                     context)
@@ -248,7 +254,7 @@ using DataStructures
 
         # Solution is optimal
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
-        @test (2*45000 + 80000) ≈ value(result.objective_model.start_cost)  # prod1 started in 2 scenarios, prod2 in S2
+        @test (2*PSCOPF.get_start_cost(prod_1_1) + PSCOPF.get_start_cost(prod_1_2)) ≈ value(result.objective_model.start_cost)  # prod1 started in 2 scenarios, prod2 in S2
 
         # S1 : prod_1_1 is cheaper to start => used
         @test PSCOPF.ON == PSCOPF.get_commitment_value(context.market_schedule, "prod_1_1", TS[1], "S1")
@@ -283,9 +289,8 @@ using DataStructures
     prod_1_1  is not listed in TSOActions => it is not gratis for market (the decision was not firm yet)
     =#
     @testset "energy_market_no_gratis_starts" begin
-        market = PSCOPF.EnergyMarket()
-        market.configs.CONSIDER_GRATIS_STARTS = false
-        println(market.configs.REF_SCHEDULE_TYPE)
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST,
+                                                                CONSIDER_GRATIS_STARTS = false))
         @assert( PSCOPF.is_tso(market.configs.REF_SCHEDULE_TYPE) )
 
         #bus2, S2, TS:11h15 : high demand
@@ -348,7 +353,7 @@ using DataStructures
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
 
         # S2 requires two units, prod_1_2 must be firm => used in both scenarios (gratis)
-        @test (45000 + 2 * 80000) ≈ value(result.objective_model.start_cost) # No cost for starting prod_1_2 at TS1
+        @test (PSCOPF.get_start_cost(prod_1_1) + 2 * PSCOPF.get_start_cost(prod_1_2)) ≈ value(result.objective_model.start_cost) # No cost for starting prod_1_2 at TS1
         @test( value(result.objective_model.prop_cost) ≈
               (   (0.   *10. + 30. * 15) #TS1, S1
                 + (0.   *10. + 50. * 15) #TS2, S1
@@ -392,7 +397,7 @@ using DataStructures
     => market pays for both units
     =#
     @testset "energy_market_does_not_consider_gratis_starts_from_preceding_tso_schedule" begin
-        market = PSCOPF.EnergyMarket()
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST))
         @assert( PSCOPF.is_tso(market.configs.REF_SCHEDULE_TYPE) )
 
         #bus2, S2, TS:11h15 : high demand
@@ -455,7 +460,7 @@ using DataStructures
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
 
         # S2 requires two units, prod_1_2 must be firm => used in both scenarios
-        @test 45000 ≈ value(result.objective_model.start_cost)
+        @test PSCOPF.get_start_cost(prod_1_1) ≈ value(result.objective_model.start_cost)
         @test( value(result.objective_model.prop_cost) ≈
               (   (0.   *10. + 30. * 15) #TS1, S1
                 + (0.   *10. + 50. * 15) #TS2, S1
@@ -499,7 +504,7 @@ using DataStructures
     => market pays for both units
     =#
     @testset "energy_market_does_not_consider_gratis_starts_from_preceding_market_schedule" begin
-        market = PSCOPF.EnergyMarket()
+        market = PSCOPF.EnergyMarket(PSCOPF.EnergyMarketConfigs(loss_of_load_penalty=LOL_COST))
         @assert( PSCOPF.is_tso(market.configs.REF_SCHEDULE_TYPE) )
 
         #bus2, S2, TS:11h15 : high demand
@@ -562,7 +567,7 @@ using DataStructures
         @test PSCOPF.get_status(result) == PSCOPF.pscopf_OPTIMAL
 
         # S2 requires two units, prod_1_2 must be firm => used in both scenarios
-        @test (45000 + 2 * 80000) ≈ value(result.objective_model.start_cost)
+        @test (PSCOPF.get_start_cost(prod_1_1) + 2 * PSCOPF.get_start_cost(prod_1_2)) ≈ value(result.objective_model.start_cost)
         @test( value(result.objective_model.prop_cost) ≈
               (   (0.   *10. + 30. * 15) #TS1, S1
                 + (0.   *10. + 50. * 15) #TS2, S1

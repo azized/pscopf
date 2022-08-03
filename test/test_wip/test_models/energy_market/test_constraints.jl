@@ -25,7 +25,7 @@ using Printf
                             |                      |
         (pilotable) prod_1_1|                      |(pilotable) prod_2_1
         Pmin=10, Pmax=100   |                      | Pmin=10, Pmax=100
-        Csta=45k, Cprop=10  |                      | Csta=80k, Cprop=15
+        Csta=450, Cprop=10  |                      | Csta=800, Cprop=15
     INIT: ON                |                      |INIT: ON
                             |                      | DP=DMO=2h
                             |                      |

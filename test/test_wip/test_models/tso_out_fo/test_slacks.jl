@@ -98,8 +98,12 @@ using DataStructures
         @test -10. ≈ ( PSCOPF.get_prod_value(PSCOPF.get_tso_schedule(context), "wind_1_1", TS[1], "S2")
                     - PSCOPF.get_uncertainties(uncertainties[ech], "wind_1_1", TS[1], "S2") )
         # We do not pay for capped power
+        @test 1. ≈ value(result.limitable_model.b_is_limited["wind_1_1", TS[1], "S1"])
+        @test 1. ≈ value(result.limitable_model.b_is_limited["wind_1_1", TS[1], "S2"])
+        @test 15. ≈ value(result.limitable_model.p_limit["wind_1_1", TS[1], "S1"])
+        @test 15. ≈ value(result.limitable_model.p_limit["wind_1_1", TS[1], "S2"])
         #If it was due to TSO constraints, we would have paid for the generator used instead of limitables
-        @test (10*1e7 + 1e-3) ≈ value(result.objective_model.penalty) # 10 loss_of_load + 1 limitation
+        @test (10*tso.configs.loss_of_load_penalty + 2*1e-3) ≈ value(result.objective_model.penalty) # 10 loss_of_load + 2 limitations
         @test value(result.objective_model.start_cost) < 1e-09
         @test ((20. - 15.) *1. + (25. - 15.) *1. ) ≈ value(result.objective_model.prop_cost)
     end
@@ -174,8 +178,7 @@ using DataStructures
         @test 25. ≈ PSCOPF.get_prod_value(PSCOPF.get_tso_schedule(context), "prod_1_1", TS[1], "S3")
         @test value(result.lol_model.p_loss_of_load["bus_1", TS[1], "S3"]) < 1e-09
         # penalize cutting consumption
-        @test 1e7 ≈ tso.configs.loss_of_load_penalty
-        @test (50. * 1e7 + 15. * 1e7 + 0. ) ≈ value(result.objective_model.penalty)
+        @test ((50. + 15. + 0. ) * tso.configs.loss_of_load_penalty) ≈ value(result.objective_model.penalty)
         @test (0. + 0. + 0.) ≈ value(result.objective_model.start_cost) #The market paid for starting
         @test (100. + 0. + 25. ) ≈ value(result.objective_model.prop_cost) #FIXME : pay just for the difference ? i.e. delta*prop_cost instead of injected*prop_cost
     end

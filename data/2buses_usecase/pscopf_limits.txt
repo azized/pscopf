@@ -1,2 +1,2 @@
-# branch limit
-"1_2"   3000
+# network_case branch limit
+  "BASECASE"   "1_2"   3000

@@ -6,13 +6,14 @@ using DataStructures
 using Printf
 using Parameters
 
+
 """
 REF_SCHEDULE_TYPE : Indicates wether to consider the preceding market or TSO schedule as a reference.
                     The reference schedule is used to get decided commitment and production levels if
                       tso actions are missing.
 """
-@with_kw mutable struct EnergyMarketConfigs
-    loss_of_load_penalty = 1e7
+@with_kw mutable struct EnergyMarketConfigs <: AbstractRunnableConfigs
+    loss_of_load_penalty = get_config("market_loss_of_load_penalty_value")
     out_path = nothing
     problem_name = "EnergyMarket"
     REF_SCHEDULE_TYPE::Union{Market,TSO} = TSO();
@@ -118,7 +119,32 @@ function energy_market(network::Networks.Network,
     #if not there a risk of cutting conso instead of using a generator
     @assert all(configs.loss_of_load_penalty > Networks.get_prop_cost(gen)
                 for gen in Networks.get_generators(network))
+    @assert all(configs.loss_of_load_penalty > Networks.get_prop_cost(gen) + Networks.get_start_cost(gen)/Networks.get_p_min(gen)
+                    for gen in Networks.get_generators(network)
+                    if Networks.needs_commitment(gen))
 
+    @timeit TIMER_TRACKS "market_modeling" model_container_l = create_market_model(network,
+                                                                                target_timepoints, generators_initial_state,
+                                                                                scenarios, uncertainties_at_ech, firmness,
+                                                                                preceding_market_schedule, preceding_tso_schedule,
+                                                                                tso_actions, gratis_starts, configs)
+
+    @timeit TIMER_TRACKS "market_solve" solve!(model_container_l, configs.problem_name, configs.out_path)
+
+    return model_container_l
+end
+
+function create_market_model(network::Networks.Network,
+                            target_timepoints::Vector{Dates.DateTime},
+                            generators_initial_state::SortedDict{String,GeneratorState},
+                            scenarios::Vector{String},
+                            uncertainties_at_ech::UncertaintiesAtEch,
+                            firmness::Firmness,
+                            preceding_market_schedule::Schedule,
+                            preceding_tso_schedule::Schedule,
+                            tso_actions::TSOActions,
+                            gratis_starts::Set{Tuple{String,Dates.DateTime}},
+                            configs::EnergyMarketConfigs)
     if is_market(configs.REF_SCHEDULE_TYPE)
         reference_schedule = preceding_market_schedule
     elseif is_tso(configs.REF_SCHEDULE_TYPE)
@@ -187,8 +213,6 @@ function energy_market(network::Networks.Network,
 
     add_objective!(model_container_l, network, gratis_starts, configs.loss_of_load_penalty)
 
-    solve!(model_container_l, configs.problem_name, configs.out_path)
-
     return model_container_l
 end
 
@@ -232,12 +256,12 @@ function update_schedule_capping!(market_schedule, context, ech, limitable_model
 
             if capped_power > 1e-09
             #distribute the capped power on limitables
-                limitations = consider_limitations ? get_limitations(get_tso_actions(context)) : SortedDict{Tuple{String, Dates.DateTime}, Float64}()
+                limitations = consider_limitations ? get_limitations(get_tso_actions(context)) : Limitations()
                 capped_by_limitations = compute_capped(uncertainties, limitations, get_network(context), ts, s)
                 capped_by_eod = capped_power - capped_by_limitations
 
-                @printf("capped %f power in scenario %s at ts %s\n", capped_power, s, ts)
-                @printf("capped %f power for eod reasons in scenario %s at ts %s\n", capped_by_eod, s, ts)
+                @info @sprintf("capped %f power in scenario %s at ts %s\n", capped_power, s, ts)
+                @info @sprintf("capped %f power for eod reasons in scenario %s at ts %s\n", capped_by_eod, s, ts)
                 distribution_key = Dict{String,Float64}(gen_id_l => get_capacity(gen_id_l, ts, s,
                                                                                 limitations,
                                                                                 uncertainties)
@@ -272,7 +296,7 @@ function update_schedule_loss_of_load!(market_schedule, context, ech, lol_model:
 
             if total_loss_of_load > 1e-09
             #distribute the cut conso on buses
-                @printf("cut conso %f in scenario %s at ts %s\n", total_loss_of_load, s, ts)
+                @info @sprintf("cut conso %f in scenario %s at ts %s\n", total_loss_of_load, s, ts)
                 distribution_key = Dict{String,Float64}(bus_id_l => get_uncertainties(uncertainties, bus_id_l, ts, s)
                                                         for bus_id_l in bus_ids)
                 distribution_key = normalize_values(distribution_key)
@@ -292,7 +316,7 @@ function update_schedule_loss_of_load!(market_schedule, context, ech, lol_model:
 end
 
 function get_capacity(gen_id, ts, s, limitations, uncertainties_at_ech)
-    p_lim = get_limitation(limitations, gen_id, ts)
+    p_lim = get_limitation(limitations, gen_id, ts, s)
 
     if ismissing(p_lim)
         return get_uncertainties(uncertainties_at_ech, gen_id, ts, s)
@@ -302,7 +326,7 @@ function get_capacity(gen_id, ts, s, limitations, uncertainties_at_ech)
 end
 
 function get_capped_by_limitations(gen_id, ts, s, limitations, uncertainties_at_ech)
-    p_lim = get_limitation(limitations, gen_id, ts)
+    p_lim = get_limitation(limitations, gen_id, ts, s)
 
     gen_capped = 0.
     if !ismissing(p_lim) && get_uncertainties(uncertainties_at_ech, gen_id, ts, s) > p_lim
@@ -315,7 +339,7 @@ end
 
 
 function compute_capped(uncertainties_at_ech::UncertaintiesAtEch,
-                        limitations::SortedDict{Tuple{String, Dates.DateTime}, Float64},
+                        limitations::SortedDict{Tuple{String, Dates.DateTime}, UncertainValue{Float64}},
                         limitable_generators, ts, s)
     if isempty(limitations)
         return 0.
@@ -329,7 +353,7 @@ function compute_capped(uncertainties_at_ech::UncertaintiesAtEch,
     return capped
 end
 function compute_capped(uncertainties_at_ech::UncertaintiesAtEch,
-                        limitations::SortedDict{Tuple{String, Dates.DateTime}, Float64},
+                        limitations::SortedDict{Tuple{String, Dates.DateTime}, UncertainValue{Float64}},
                         network::Networks.Network, ts, s)
     limitable_generators = Networks.get_generators_of_type(network, Networks.LIMITABLE)
     return compute_capped(uncertainties_at_ech, limitations, limitable_generators, ts, s)

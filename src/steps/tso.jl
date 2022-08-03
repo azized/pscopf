@@ -96,6 +96,7 @@ end
 function update_tso_actions!(context::AbstractContext, ech, result, firmness,
                             ::TSOOutFO)
     tso_actions = get_tso_actions(context)
+    reset_tso_actions!(tso_actions)
 
     # Limitations :
     # FIXME ; limit only if there is a limitation needed !?
@@ -103,7 +104,8 @@ function update_tso_actions!(context::AbstractContext, ech, result, firmness,
     for ((gen_id, ts, s), p_limit_var) in result.limitable_model.p_limit
         if get_power_level_firmness(firmness, gen_id, ts) in [TO_DECIDE, DECIDED]
             @assert( value(p_limit_var) ≈ get!(limitations, (gen_id, ts), value(p_limit_var)) ) #TODELETE : checks that all values are the same across scenarios
-            set_limitation_value!(tso_actions, gen_id, ts, value(p_limit_var))
+            add_missing_scenarios(get_limitation_uncertain_value!(tso_actions, gen_id, ts), get_scenarios(context))
+            set_limitation_definitive_value!(tso_actions, gen_id, ts, value(p_limit_var))
         end
     end
 

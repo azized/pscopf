@@ -6,15 +6,16 @@ using DataStructures
 using Printf
 using Parameters
 
+
 """
 REF_SCHEDULE_TYPE : Indicates wether to consider the preceding market or TSO schedule as a reference.
                     The reference schedule is used to get decided commitment and production levels if
                       tso actions are missing.
 """
-@with_kw mutable struct TSOConfigs
-    CONSIDER_N_1_CSTRS::Bool = false
-    loss_of_load_penalty = 1e7
-    limitation_penalty = 1e-03
+@with_kw mutable struct TSOConfigs <: AbstractRunnableConfigs
+    CONSIDER_N_1_CSTRS::Bool = get_config("CONSIDER_N_1")
+    loss_of_load_penalty = get_config("tso_loss_of_load_penalty_value")
+    limitation_penalty = get_config("tso_limit_penalty_value")
     out_path = nothing
     problem_name = "TSO"
     REF_SCHEDULE_TYPE::Union{Market,TSO} = TSO();
@@ -73,10 +74,14 @@ end
     eod_constraint::SortedDict{Tuple{Dates.DateTime,String}, ConstraintRef} =
         SortedDict{Tuple{Dates.DateTime,String}, ConstraintRef}()
     #branch,ts,s,ptdf_case
+    rso_combinations::Vector{Tuple{String,DateTime,String,String}} =
+        Vector{Tuple{String,DateTime,String,String}}()
     flows::SortedDict{Tuple{String,DateTime,String,String},AffExpr} =
         SortedDict{Tuple{String,DateTime,String,String},AffExpr}()
-    rso_constraint::SortedDict{Tuple{String,DateTime,String,String},ConstraintRef} =
-        SortedDict{Tuple{String,DateTime,String,String},ConstraintRef}()
+    rso_constraints::SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}} =
+        SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}}()
+    #deltas constraint
+    deltas_bounding_constraint::Union{ConstraintRef, Missing} = missing
 end
 
 function has_positive_slack(model_container::TSOModel)::Bool
@@ -163,19 +168,16 @@ function create_objectives!(model_container::TSOModel,
     return model_container
 end
 
-
-function tso_out_fo(network::Networks.Network,
-                    target_timepoints::Vector{Dates.DateTime},
-                    generators_initial_state::SortedDict{String,GeneratorState},
-                    scenarios::Vector{String},
-                    uncertainties_at_ech::UncertaintiesAtEch,
-                    firmness::Firmness,
-                    preceding_market_schedule::Schedule,
-                    preceding_tso_schedule::Schedule,
-                    gratis_starts::Set{Tuple{String,Dates.DateTime}},
-                    configs::TSOConfigs
-                    )
-
+function create_tso_model(network::Networks.Network,
+                        target_timepoints::Vector{Dates.DateTime},
+                        generators_initial_state::SortedDict{String,GeneratorState},
+                        scenarios::Vector{String},
+                        uncertainties_at_ech::UncertaintiesAtEch,
+                        firmness::Firmness,
+                        preceding_market_schedule::Schedule,
+                        preceding_tso_schedule::Schedule,
+                        gratis_starts::Set{Tuple{String,Dates.DateTime}},
+                        configs::TSOConfigs)
     # TODO : check coherence between : preceding_reference_schedule and TSOActions.impositions cause we do not consider TSOActions
     if is_market(configs.REF_SCHEDULE_TYPE)
         reference_schedule = preceding_market_schedule
@@ -238,28 +240,48 @@ function tso_out_fo(network::Networks.Network,
                     )
 
     # RSO
-    add_rso_flows_exprs(model_container_l.flows,
-                model_container_l.pilotable_model,
-                model_container_l.limitable_model,
-                model_container_l.lol_model,
-                all_combinations(network, target_timepoints, scenarios),
-                uncertainties_at_ech, network)
-    combinations = (configs.CONSIDER_N_1_CSTRS) ? all_combinations(network, target_timepoints, scenarios) :
-                                                    all_n_combinations(network, target_timepoints, scenarios)
-    rso_constraints!(model_container_l.model,
-                    model_container_l.rso_constraint,
-                    model_container_l.flows,
-                    combinations,
-                    network,
-                    prefix="tso")
+    #just adds the combinations to consider not the constraints
+    add_rso_combinations!(get_rso_combinations(model_container_l),
+                        configs.CONSIDER_N_1_CSTRS,
+                        network, target_timepoints, scenarios)
 
     create_objectives!(model_container_l,
                         network, uncertainties_at_ech,
                         gratis_starts,
                         configs.loss_of_load_penalty, configs.limitation_penalty)
 
+    return model_container_l
+end
 
-    solve_2steps_deltas!(model_container_l, configs)
+function tso_out_fo(network::Networks.Network,
+                    target_timepoints::Vector{Dates.DateTime},
+                    generators_initial_state::SortedDict{String,GeneratorState},
+                    scenarios::Vector{String},
+                    uncertainties_at_ech::UncertaintiesAtEch,
+                    firmness::Firmness,
+                    preceding_market_schedule::Schedule,
+                    preceding_tso_schedule::Schedule,
+                    gratis_starts::Set{Tuple{String,Dates.DateTime}},
+                    configs::TSOConfigs
+                    )
+    @assert all(configs.loss_of_load_penalty > Networks.get_prop_cost(gen)
+                for gen in Networks.get_generators(network))
+    @assert all(configs.loss_of_load_penalty > Networks.get_prop_cost(gen) + Networks.get_start_cost(gen)/Networks.get_p_min(gen)
+                for gen in Networks.get_generators(network)
+                if Networks.needs_commitment(gen))
+
+    @timeit TIMER_TRACKS "tso_modeling" model_container_l = create_tso_model(network, target_timepoints, generators_initial_state,
+                                                                            scenarios, uncertainties_at_ech, firmness,
+                                                                            preceding_market_schedule, preceding_tso_schedule,
+                                                                            gratis_starts,
+                                                                            configs)
+
+    tso_solve!(model_container_l,
+                solve_2steps_deltas!, configs,
+                uncertainties_at_ech, network,
+                get_config("ADD_RSO_CSTR_DYNAMICALLY"))
+
+    @timeit TIMER_TRACKS "flows.log" log_flows(model_container_l, network, configs.out_path, configs.problem_name)
 
     return model_container_l
 end

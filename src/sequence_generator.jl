@@ -61,10 +61,10 @@ function gen_seq_mode1(seq_generator::SequenceGenerator)
             msg = @sprintf(("Error when generating sequence: ech (%s) is after target timepoint (%s)."),
                             ech, first_ts)
             throw( error(msg) )
+        else
+            add_step!(sequence, Assessment, ech) #first_ts
         end
     end
-
-    add_step!(sequence, Assessment, seq_generator.horizon_timepoints[end])
 
     return sequence
 end
@@ -102,11 +102,11 @@ function gen_seq_mode2(seq_generator::SequenceGenerator)
             msg = @sprintf(("Error when generating sequence: ech (%s) is after target timepoint (%s)."),
                             ech, first_ts)
             throw( error(msg) )
+        else
+            add_step!(sequence, Assessment, ech) #first_ts
         end
         preceding_ech = ech
     end
-
-    add_step!(sequence, Assessment, seq_generator.horizon_timepoints[end])
 
     return sequence
 end
@@ -136,10 +136,10 @@ function gen_seq_mode3(seq_generator::SequenceGenerator)
             msg = @sprintf(("Error when generating sequence: ech (%s) is after target timepoint (%s)."),
                             ech, first_ts)
             throw( error(msg) )
+        else
+            add_step!(sequence, Assessment, ech) #first_ts
         end
     end
-
-    add_step!(sequence, Assessment, seq_generator.horizon_timepoints[end])
 
     return sequence
 end

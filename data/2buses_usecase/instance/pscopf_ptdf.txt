@@ -1,4 +1,4 @@
-#                 REF_BUS         unknown
-#                  branch                      bus           value
-                      1_2                poste_1_0  5.00000000E-01
-                      1_2                poste_2_0 -5.00000000E-01
+#             REF_BUS          "distributed"
+#               case          branch         bus                ptdf
+                "BASECASE"    "1_2"          "poste_1_0"         5.000000E-01
+                "BASECASE"    "1_2"          "poste_2_0"        -5.000000E-01

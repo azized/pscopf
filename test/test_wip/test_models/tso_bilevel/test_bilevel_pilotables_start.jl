@@ -21,11 +21,11 @@ using Printf
         # Pilotables
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_1", "prod_1_1", PSCOPF.Networks.PILOTABLE,
                                                 20., 200.,
-                                                1000., 10.,
+                                                100., 1.,
                                                 Dates.Second(10), Dates.Second(0))
         PSCOPF.Networks.add_new_generator_to_bus!(network, "bus_2", "prod_2_1", PSCOPF.Networks.PILOTABLE,
                                                 20., 200.,
-                                                5000., 50.,
+                                                250., 5.,
                                                 Dates.Second(10), Dates.Second(0))
 
         # Uncertainties
@@ -74,7 +74,7 @@ using Printf
                             |                      |
         (limitable) prod_1_1|       "1_2"          |prod_2_1
         Pmin=20, Pmax=200   |                      |Pmin=20, Pmax=200
-        Csta=1k, Cprop=10   |                      |Csta=5k, Cprop=50
+        Csta=100, Cprop=1   |                      |Csta=250, Cprop=5
                             |----------------------|
                             |         35           |
                             |                      |
@@ -149,7 +149,7 @@ using Printf
                             |                      |
         (limitable) prod_1_1|                      |prod_2_1
         Pmin=20, Pmax=200   |                      |Pmin=20, Pmax=200
-        Csta=1k, Cprop=10   |        "1_2"         |Csta=5k, Cprop=50
+        Csta=100, Cprop=1   |        "1_2"         |Csta=250, Cprop=5
                             |----------------------|
                             |         35           |
                             |                      |
@@ -187,6 +187,7 @@ using Printf
             context = create_instance(30., 30.,
                                     PSCOPF.OFF, PSCOPF.OFF,
                                     35.,"start_imp_test")
+            prod_1_1 = PSCOPF.safeget_generator(PSCOPF.get_network(context), "prod_1_1")
 
             tso = PSCOPF.TSOBilevel(PSCOPF.TSOBilevelConfigs(USE_UNITS_PROP_COST_AS_TSO_BOUNDING_COST=true))
             firmness = PSCOPF.compute_firmness(tso,
@@ -219,8 +220,9 @@ using Printf
             @test 60. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
             @test value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"]) < 1e-09
 
-            @test value(PSCOPF.get_upper_obj_expr(result)) ≈ 20. * 10. #imposition cost of prod_1_1
-            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * 10.)
+            # prod_1_1 was imposed to start but the bounds correspond to the unit capacities
+            @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (PSCOPF.get_start_cost(prod_1_1))
+            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * PSCOPF.get_prop_cost(prod_1_1))
 
         end
 
@@ -233,7 +235,7 @@ using Printf
                             |                      |
         (limitable) prod_1_1|       "1_2"          |prod_2_1
         Pmin=20, Pmax=200   |                      |Pmin=20, Pmax=200
-        Csta=1k, Cprop=10   |                      |Csta=5k, Cprop=50
+        Csta=100, Cprop=1   |                      |Csta=250, Cprop=5
                             |----------------------|
                             |         35           |
                             |                      |
@@ -296,8 +298,9 @@ using Printf
             @test 60. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
             @test value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"]) < 1e-09
 
-            @test value(PSCOPF.get_upper_obj_expr(result)) ≈ 20. *10. #imposition of prod_1_1
-            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * 10.)
+            prod_1_1 = PSCOPF.safeget_generator(PSCOPF.get_network(context), "prod_1_1")
+            @test value(PSCOPF.get_upper_obj_expr(result)) ≈ PSCOPF.get_start_cost(prod_1_1) #prod_1_1 started at its capacities bounds
+            @test value(PSCOPF.get_lower_obj_expr(result)) ≈ (60 * PSCOPF.get_prop_cost(prod_1_1))
 
         end
 
@@ -308,7 +311,7 @@ using Printf
                             |                      |
         (limitable) prod_1_1|       "1_2"          |prod_2_1
         Pmin=20, Pmax=200   |                      |Pmin=20, Pmax=200
-        Csta=1k, Cprop=10   |                      |Csta=5k, Cprop=50
+        Csta=100, Cprop=1   |                      |Csta=250, Cprop=5
                             |----------------------|
                             |         35           |
                             |                      |
@@ -376,7 +379,7 @@ using Printf
                             |                      |
         (limitable) prod_1_1|       "1_2"          |prod_2_1
         Pmin=20, Pmax=200   |                      |Pmin=20, Pmax=200
-        Csta=1k, Cprop=10   |                      |Csta=5k, Cprop=50
+        Csta=100, Cprop=1   |                      |Csta=250, Cprop=5
                             |----------------------|
                             |         35           |
                             |                      |
@@ -444,7 +447,7 @@ using Printf
                         |                      |
     (limitable) prod_1_1|       "1_2"          |prod_2_1
     Pmin=20, Pmax=200   |                      |Pmin=20, Pmax=200
-    Csta=0, Cprop=10    |                      |Csta=0, Cprop=50
+    Csta=100, Cprop=1   |                      |Csta=250, Cprop=5
                         |----------------------|
                         |         35           |
                         |                      |
@@ -509,7 +512,9 @@ using Printf
         @test 45. ≈ value(result.lower.pilotable_model.p_injected["prod_1_1",TS[1],"S1"])
         @test 65. ≈ value(result.lower.pilotable_model.p_injected["prod_2_1",TS[1],"S1"])
 
-        @test 65. ≈ objective_value(result.upper.model)
+        prod_2_1 = PSCOPF.safeget_generator(PSCOPF.get_network(context), "prod_2_1")
+        @test value(PSCOPF.get_upper_obj_expr(result)) ≈ (PSCOPF.get_start_cost(prod_2_1)
+                                                    + (200. - 200 + 65 - 20.) ) # + bounding of prod_1_1 costs 0
 
     end
 

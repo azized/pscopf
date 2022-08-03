@@ -1,0 +1,7 @@
+#             REF_BUS              "bus_2"
+        "branch_1_2"              "bus_1"         9.999990E-01
+        "branch_1_2"              "bus_2"         0.000000E+00
+        "branch_1_2"              "bus_3"         0.000000E+00
+        "branch_2_3"              "bus_1"         0.000000E+00
+        "branch_2_3"              "bus_2"         0.000000E+00
+        "branch_2_3"              "bus_3"        -9.999990E-01
