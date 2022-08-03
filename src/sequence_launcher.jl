@@ -223,7 +223,7 @@ function trace_firmness(firmness::Firmness)
         if !isempty(TS_to_decide_for)
             msg = @sprintf("TO_DECIDE commitment (Firm) :  %s for %s",
                             gen_id, TS_to_decide_for)
-            @info msg
+            @debug msg
         end
     end
 
@@ -237,7 +237,7 @@ function trace_firmness(firmness::Firmness)
         if !isempty(TS_to_decide_for)
             msg = @sprintf("TO_DECIDE production level (Firm) :  %s for %s",
                             gen_id, TS_to_decide_for)
-            @info msg
+            @debug msg
         end
     end
 end
