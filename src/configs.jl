@@ -19,7 +19,7 @@ const DEFAULT_CONFIGS = (
 
     PSCOPF_TIME_LIMIT_IN_SECONDS = nothing,
     PSCOPF_REDIRECT_LOG = true,
-    SOLVER_LP_FILES = false,
+    LP_FILES = false,
 
     CNT_ACTIVE_RSO_CSTRS = false,
     LOG_COMBINATIONS = false,
