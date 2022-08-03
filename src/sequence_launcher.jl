@@ -183,6 +183,8 @@ function run!(context_p::AbstractContext, sequence_p::Sequence;
 
         end
     end
+
+    @info PSCOPF.TIMER_TRACKS
 end
 
 
