@@ -966,6 +966,7 @@ function create_tso_bilevel_model(network::Networks.Network,
 
     bimodel_container_l = TSOBilevelModel()
 
+    @debug "create vars"
     create_tso_vars!(bimodel_container_l.upper,
                     network, target_timepoints, scenarios,
                     preceding_market_schedule)
@@ -977,6 +978,7 @@ function create_tso_bilevel_model(network::Networks.Network,
     create_market_objectives!(bimodel_container_l.lower, network,
                             configs.MARKET_CAPPING_COST, configs.MARKET_LOL_PENALTY)
 
+    @debug "create constraints (apart from RSO constraints)"
     #constraints may use upper and lower vars at the same time
     add_tso_constraints!(bimodel_container_l, target_timepoints, scenarios, network,
                         firmness, reference_schedule, generators_initial_state,
@@ -1031,6 +1033,7 @@ function tso_bilevel(network::Networks.Network,
                                                                         preceding_market_schedule, preceding_tso_schedule,
                                                                         configs)
 
+    @debug "called tso solve : build RSO constraints and launch solver"
     tso_solve!(bimodel_container_l,
                 launch_solve!, configs,
                 uncertainties_at_ech, network,

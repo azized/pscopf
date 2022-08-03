@@ -13,7 +13,7 @@ const DEFAULT_CONFIGS = (
     lol_eps = 1e-04,
     FIX_NULL_LOL = false,
 
-    MAX_ADD_RSO_CSTR_PER_ITER = nothing,
+    MAX_ADD_RSO_CSTR_PER_ITER = 1,
     ADD_RSO_CSTR_DYNAMICALLY = false,
     CONSIDER_N_1 = true,
 
