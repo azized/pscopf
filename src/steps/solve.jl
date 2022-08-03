@@ -63,9 +63,6 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
             branch_limit = Networks.safeget_limit(branch, network_case)
             @timeit TIMER_TRACKS "eval_expr" violation_l = max(0., abs(value(flow_expr_l)) - branch_limit)
             if violation_l > 0
-                add_rso_flow_expr!(model_container,
-                                flow_expr_l,
-                                branch, ts, s, network_case)
                 # store violated combinations to add constraints later, not to invalidate the model now
                 push!(violated_combinations, (branch, ts, s, network_case) => violation_l)
             end
@@ -85,13 +82,20 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
         set_start_values!(get_model(model_container))
     end
 
+    timed_l = @timed begin
     @timeit TIMER_TRACKS "add_cstrs" for ((branch, ts, s, network_case) ,_) in violated_combinations_to_add
-        (branch, ts, s, network_case) = sorted_violations[cnt_l][1]
-
+        flow_expr_l = flow_expr(model_container,
+                                branch, ts, s, network_case,
+                                uncertainties_at_ech, network)
+        add_rso_flow_expr!(model_container,
+                                flow_expr_l,
+                                branch, ts, s, network_case)
         add_rso_constraint!(get_model(model_container), get_rso_constraints(model_container),
                         get_flows(model_container),
                         branch, ts, s, network_case)
     end
+    end
+    @info @sprintf("adding RSO constraints took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
 
     return has_violations
 end
