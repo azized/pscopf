@@ -36,6 +36,7 @@ function main_launch_tso_bilevel(case_p::String;
     # Activate dynamic solving
     PSCOPF.set_config!("ADD_RSO_CSTR_DYNAMICALLY", dynamic_p)
     PSCOPF.set_config!("MAX_ADD_RSO_CSTR_PER_ITER", nb_cstr_add_per_iter_p)
+    PSCOPF.set_config!("DYNAMIC_ONLY_STEP1", true)
     # LOL sensibility problems
     PSCOPF.set_config!("FIX_NULL_LOL", null_lol_p)
     # LOG options

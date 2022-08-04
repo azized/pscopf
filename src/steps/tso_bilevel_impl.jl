@@ -1047,7 +1047,11 @@ function launch_solve!(bimodel_container::TSOBilevelModel, configs::TSOBilevelCo
 
     #the upper problem's objective model holds the two objective expressions and the deltas expression
     if configs.CONSIDER_DELTAS
-        solve_2steps_deltas!(bimodel_container, configs)
+        if get_config("DYNAMIC_ONLY_STEP1")
+            solve_step1!(bimodel_container, configs)
+        else
+            solve_2steps_deltas!(bimodel_container, configs)
+        end
     else
         obj = get_objective_model(bimodel_container).full_obj_2 #upper tso model, step2 objective
         @objective(get_model(bimodel_container), Min, obj)

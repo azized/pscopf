@@ -277,7 +277,8 @@ function tso_out_fo(network::Networks.Network,
                                                                             configs)
 
     tso_solve!(model_container_l,
-                solve_2steps_deltas!, configs,
+                get_config("DYNAMIC_ONLY_STEP1") ? solve_step1! : solve_2steps_deltas!,
+                configs,
                 uncertainties_at_ech, network,
                 get_config("ADD_RSO_CSTR_DYNAMICALLY"))
 

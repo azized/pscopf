@@ -15,6 +15,7 @@ const DEFAULT_CONFIGS = (
 
     MAX_ADD_RSO_CSTR_PER_ITER = 1,
     ADD_RSO_CSTR_DYNAMICALLY = false,
+    DYNAMIC_ONLY_STEP1 = false,
     CONSIDER_N_1 = true,
 
     PSCOPF_TIME_LIMIT_IN_SECONDS = nothing,
