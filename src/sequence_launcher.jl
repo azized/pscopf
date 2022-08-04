@@ -99,7 +99,9 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
     @timeit TIMER_TRACKS "run_model" result = run(step, ech, firmness,
                                                 get_target_timepoints(context_p),
                                                 context_p)
-    log_nb_rso_cstrs(get_config("LOG_NB_CSTRS_FILENAME"), result, context_p.out_dir, ech)
+    log_nb_rso_cstrs(get_config("LOG_NB_CSTRS_FILENAME"), result,
+                    theoretical_nb_combinations(get_network(context_p), get_target_timepoints(context_p), get_scenarios(context_p)),
+                    context_p.out_dir, ech)
 
     if affects_market_schedule(step)
     @timeit TIMER_TRACKS "update_schedules" begin
@@ -343,10 +345,11 @@ function trace_impositions(tso_actions)
     end
 end
 
-function log_nb_rso_cstrs(::Any, ::Union{Nothing,AbstractModelContainer}, ::Any, ::Any)
+function log_nb_rso_cstrs(::Any, ::Union{Nothing,AbstractModelContainer}, ::Any, ::Any, ::Any)
 end
 function log_nb_rso_cstrs(logfile::String,
                         result::Union{TSOModel, TSOBilevel, TSOBilevelModel, TSOBilevelTSOModelContainer},
+                        nb_possible_combinations::Int,
                         outdir::String, ech::DateTime)
     #TODO : avoid hardcode
     index = findfirst("pscopf", lowercase(outdir))
@@ -358,10 +361,9 @@ function log_nb_rso_cstrs(logfile::String,
     end
     open(logfile, "a") do file_l
         considered = length(get_rso_constraints(result))
-        possible = length(get_rso_combinations(result))
         Base.write(file_l, @sprintf("%s %s %s %s %s %d %d %.3f %s\n",
                                 usecase_name, get_config("ADD_RSO_CSTR_DYNAMICALLY"), typeof(result), ech, get_status(result),
-                                considered, possible, considered/possible, total_lol(result) ))
+                                considered, nb_possible_combinations, considered/nb_possible_combinations, total_lol(result) ))
     end
 
     if get_config("LOG_COMBINATIONS")

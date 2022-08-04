@@ -104,11 +104,15 @@ function get_scenarios(uncertainties::Uncertainties)::Vector{String}
     return Vector{String}()
 end
 
+function get_target_timepoints(uncertainties_at_ech::UncertaintiesAtEch)::Vector{Dates.DateTime}
+    for (_, by_ts) in uncertainties_at_ech
+        return collect(keys(by_ts))
+    end
+    return Vector{Dates.DateTime}()
+end
 function get_target_timepoints(uncertainties::Uncertainties)::Vector{Dates.DateTime}
     for (_, uncertainties_at_ech) in uncertainties
-        for (_, by_ts) in uncertainties_at_ech
-            return collect(keys(by_ts))
-        end
+        return get_target_timepoints(uncertainties_at_ech)
     end
     return Vector{Dates.DateTime}()
 end

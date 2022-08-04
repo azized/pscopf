@@ -74,8 +74,6 @@ end
     eod_constraint::SortedDict{Tuple{Dates.DateTime,String}, ConstraintRef} =
         SortedDict{Tuple{Dates.DateTime,String}, ConstraintRef}()
     #branch,ts,s,ptdf_case
-    rso_combinations::Vector{Tuple{String,DateTime,String,String}} =
-        Vector{Tuple{String,DateTime,String,String}}()
     flows::SortedDict{Tuple{String,DateTime,String,String},AffExpr} =
         SortedDict{Tuple{String,DateTime,String,String},AffExpr}()
     rso_constraints::SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}} =
@@ -239,11 +237,7 @@ function create_tso_model(network::Networks.Network,
                     uncertainties_at_ech, network
                     )
 
-    # RSO
-    #just adds the combinations to consider not the constraints
-    add_rso_combinations!(get_rso_combinations(model_container_l),
-                        configs.CONSIDER_N_1_CSTRS,
-                        network, target_timepoints, scenarios)
+    # RSO Constraints are missing
 
     create_objectives!(model_container_l,
                         network, uncertainties_at_ech,
@@ -282,7 +276,9 @@ function tso_out_fo(network::Networks.Network,
                 uncertainties_at_ech, network,
                 get_config("ADD_RSO_CSTR_DYNAMICALLY"))
 
-    @timeit TIMER_TRACKS "flows.log" log_flows(model_container_l, network, configs.out_path, configs.problem_name)
+    @timeit TIMER_TRACKS "flows.log" log_flows(model_container_l, network,
+                                            theoretical_nb_combinations(network, target_timepoints, scenarios),
+                                            configs.out_path, configs.problem_name)
 
     return model_container_l
 end

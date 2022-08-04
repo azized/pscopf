@@ -1268,14 +1268,6 @@ end
 ##################
 
 
-"""
-    returns the RSO combinations (i.e. branch,ts,s,network_case) to be considered
-# Note
-    Not all combinations have corresponding constraints and flows in the model_container!
-"""
-function get_rso_combinations(model_container::AbstractModelContainer)
-    return model_container.rso_combinations
-end
 function get_flows(model_container::AbstractModelContainer)
     return model_container.flows
 end
@@ -1283,18 +1275,8 @@ function get_rso_constraints(model_container::AbstractModelContainer)
     return model_container.rso_constraints
 end
 
-function add_rso_combinations!(rso_combinations::Vector{Tuple{String,Dates.DateTime,String,String}},
-                            consider_all,
-                            network, target_timepoints, scenarios)
-    if consider_all
-        append!(rso_combinations, all_combinations(network, target_timepoints, scenarios))
-    else
-        append!(rso_combinations, basecase_combinations(network, target_timepoints, scenarios))
-    end
-end
-
 function add_rso_flows_exprs!(model_container::AbstractModelContainer,
-                combinations_to_add, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
+                combinations_to_add, #container/Generator of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
                 uncertainties_at_ech, network::Networks.Network)
     for (branch_id, ts, s, ptdf_case) in combinations_to_add
         branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
@@ -1456,21 +1438,17 @@ end
 # Helpers
 ##################
 
-function basecase_combinations(network, target_timepoints, scenarios)
-    return [(branch_id,ts,s,Networks.BASECASE)
-                for branch_id in map(Networks.get_id, Networks.get_branches(network))
-                for ts in target_timepoints
-                for s in scenarios
-            ]
-end
-
-function all_combinations(network, target_timepoints, scenarios)
-    return [(branch_id,ts,s,case)
+function available_combinations(network, target_timepoints, scenarios)
+    return ((branch_id,ts,s,case)
                 for branch_id in map(Networks.get_id, Networks.get_branches(network))
                 for ts in target_timepoints
                 for s in scenarios
                 for case in Networks.get_cases(network) #if the network does not hold the PTDF data for a case it will be ignored
-            ]
+            )
+end
+
+function theoretical_nb_combinations(network, target_timepoints, scenarios)
+    return length(Networks.get_branches(network)) * length(target_timepoints) * length(scenarios) * length(Networks.get_cases(network))
 end
 
 """
@@ -1478,7 +1456,7 @@ end
     The number of active constraints is not exact since, in a MIP context,
      some constraints that have non-negative slack might be influential/active
 """
-function log_flows(model_container,network,out_folder,filename)
+function log_flows(model_container,network,nb_potential_cstrs,out_folder,filename)
     filename_l = valid_filename(filename)
     flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr} = get_flows(model_container)
     if !isnothing(out_folder)
@@ -1502,7 +1480,6 @@ function log_flows(model_container,network,out_folder,filename)
     if get_config("CNT_ACTIVE_RSO_CSTRS")
         @warn "This section is time consuming deactivate it with : set_config!(\"CNT_ACTIVE_RSO_CSTRS\", false)"
 
-        nb_potential_cstrs = length(get_rso_combinations(model_container)) # lb <= flow <= ub counts as one constraint
         nb_active_cstrs = 0
         for (_, (cstr_lb,cstr_ub)) in get_rso_constraints(model_container)
             if !has_slack(cstr_lb) || !has_slack(cstr_ub)

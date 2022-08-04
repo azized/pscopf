@@ -7,17 +7,18 @@ function tso_solve!(model_container::AbstractModelContainer,
         @timeit TIMER_TRACKS "tso_dynamic_solve" iterative_solve_on_rso_constraints!(model_container,
                                                                             solve_fct, configs, uncertainties_at_ech, network)
     else
-        @info @sprintf("adding %d RSO constraints", length(get_rso_combinations(model_container)))
         @timeit TIMER_TRACKS "tso_modeling" begin
-        @timeit TIMER_TRACKS "rso_cstrs" begin
-            add_rso_flows_exprs!(model_container,
-                                get_rso_combinations(model_container),
-                                uncertainties_at_ech,
-                                network)
-            add_rso_constraints!(model_container,
-                                get_rso_combinations(model_container),
-                                network)
-        end
+            @timeit TIMER_TRACKS "rso_cstrs" begin
+                rso_combinations = available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))
+                @info @sprintf("adding %d constraints", length(rso_combinations))
+                add_rso_flows_exprs!(model_container,
+                                    rso_combinations,
+                                    uncertainties_at_ech,
+                                    network)
+                add_rso_constraints!(model_container,
+                                    rso_combinations,
+                                    network)
+            end
         end
         @info "tso_solve!: actual solve"
         @timeit TIMER_TRACKS "tso_solve" solve_fct(model_container, configs)
@@ -35,13 +36,17 @@ function build_fast_ptdf(ptdf::PTDFDict)
     end
     return result_ptdf
 end
+
 function iterative_solve_on_rso_constraints!(model_container::AbstractModelContainer,
                                         solve_fct::Base.Callable, configs::AbstractRunnableConfigs,
                                         uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
+    timepoints = get_target_timepoints(uncertainties_at_ech)
+    scenarios = get_scenarios(uncertainties_at_ech)
+
     did_add_constraints = true
     while(did_add_constraints)
         @info @sprintf("dynamic solve: handling %d constraints out of %d\n",
-            length(get_rso_constraints(model_container)), length(get_rso_combinations(model_container)))
+            length(get_rso_constraints(model_container)), theoretical_nb_combinations(network, timepoints, scenarios))
         solve_fct(model_container, configs)
 
         # model is infeasible, adding constraints will not solve the issue
@@ -50,17 +55,18 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
             return
         end
 
-        @timeit TIMER_TRACKS "generate_rso_cstrs" did_add_constraints = generate_rso_constraints!(model_container, uncertainties_at_ech, network)
+        max_add_per_iter = get_config("MAX_ADD_RSO_CSTR_PER_ITER") < 0 ? theoretical_nb_combinations(network, timepoints, scenarios) : get_config("MAX_ADD_RSO_CSTR_PER_ITER")
+        @timeit TIMER_TRACKS "generate_rso_cstrs" did_add_constraints = generate_rso_constraints!(model_container, uncertainties_at_ech, network, max_add_per_iter)
     end
 
     @info @sprintf("Dynamically added %d constraints out of %d possible combinations\n",
-            length(get_rso_constraints(model_container)), length(get_rso_combinations(model_container)))
+            length(get_rso_constraints(model_container)), theoretical_nb_combinations(network, timepoints, scenarios))
 end
 
 
 function generate_rso_constraints!(model_container::AbstractModelContainer,
-                                uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
-    max_add_per_iter = get_config("MAX_ADD_RSO_CSTR_PER_ITER") < 0 ? length(get_rso_combinations(model_container)) : get_config("MAX_ADD_RSO_CSTR_PER_ITER")
+                                uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network,
+                                max_add_per_iter)
     ptdf_l = build_fast_ptdf(network.ptdf)
 
     violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
@@ -70,7 +76,7 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
         p_values_lol = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_local_lol(model_container))], keys(get_local_lol(model_container))))
     end
     @info @sprintf("creating values container took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
-    timed_l = @timed for (branch_id,ts,s,network_case) in get_rso_combinations(model_container)
+    timed_l = @timed for (branch_id,ts,s,network_case) in available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))
         # constraint not considered in the model yet
         if !((branch_id,ts,s,network_case) in keys(get_rso_constraints(model_container)))
             branch = Networks.get_branch(network, branch_id)
