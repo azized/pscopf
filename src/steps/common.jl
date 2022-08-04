@@ -1422,13 +1422,13 @@ end
 
 function flow_val(branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
                 uncertainties_at_ech, network::Networks.Network,
-                p_values_lim, p_values_pil, p_values_lol)::Float64
+                p_values_lim, p_values_pil, p_values_lol, ptdf_p)::Float64
     branch_id = Networks.get_id(branch)
 
     flow_l = 0.
     for bus in Networks.get_buses(network)
         bus_id = Networks.get_id(bus)
-        ptdf = Networks.safeget_ptdf_elt(network, branch_id, bus_id, ptdf_case)
+        ptdf = ptdf_p[ptdf_case, branch_id, bus_id]
 
         # + injections limitables
         for gen in Networks.get_generators_of_type(bus, Networks.LIMITABLE)

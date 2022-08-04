@@ -24,6 +24,17 @@ function tso_solve!(model_container::AbstractModelContainer,
     end
 end
 
+function build_fast_ptdf(ptdf::PTDFDict)
+    result_ptdf = Dict{Tuple{String, String, String},Float64}()
+    for (case, ptdf_vals) in ptdf
+        for (branch, ptdf_elts) in ptdf_vals
+            for (bus, val) in ptdf_elts
+                result_ptdf[case, branch, bus] = val
+            end
+        end
+    end
+    return result_ptdf
+end
 function iterative_solve_on_rso_constraints!(model_container::AbstractModelContainer,
                                         solve_fct::Base.Callable, configs::AbstractRunnableConfigs,
                                         uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
@@ -50,6 +61,7 @@ end
 function generate_rso_constraints!(model_container::AbstractModelContainer,
                                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
     max_add_per_iter = get_config("MAX_ADD_RSO_CSTR_PER_ITER") < 0 ? length(get_rso_combinations(model_container)) : get_config("MAX_ADD_RSO_CSTR_PER_ITER")
+    ptdf_l = build_fast_ptdf(network.ptdf)
 
     violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
     timed_l = @timed  begin
@@ -64,7 +76,7 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
             branch = Networks.get_branch(network, branch_id)
             @timeit TIMER_TRACKS "create_or_get_expr" flow_val_l = flow_val(branch, ts, s, network_case,
                                                                         uncertainties_at_ech, network,
-                                                                        p_values_lim, p_values_pil, p_values_lol)
+                                                                        p_values_lim, p_values_pil, p_values_lol, ptdf_l)
 
             branch_limit = Networks.safeget_limit(branch, network_case)
             @timeit TIMER_TRACKS "eval_expr" violation_l = max(0., abs(flow_val_l) - branch_limit)
