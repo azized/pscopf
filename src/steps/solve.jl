@@ -56,12 +56,12 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
         # constraint not considered in the model yet
         if !((branch_id,ts,s,network_case) in keys(get_rso_constraints(model_container)))
             branch = Networks.get_branch(network, branch_id)
-            @timeit TIMER_TRACKS "create_or_get_expr" flow_expr_l = flow_expr(model_container,
+            @timeit TIMER_TRACKS "create_or_get_expr" flow_val_l = flow_val(model_container,
                                     branch, ts, s, network_case,
                                     uncertainties_at_ech, network)
 
             branch_limit = Networks.safeget_limit(branch, network_case)
-            @timeit TIMER_TRACKS "eval_expr" violation_l = max(0., abs(value(flow_expr_l)) - branch_limit)
+            @timeit TIMER_TRACKS "eval_expr" violation_l = max(0., abs(flow_val_l) - branch_limit)
             if violation_l > 0
                 # store violated combinations to add constraints later, not to invalidate the model now
                 push!(violated_combinations, (branch, ts, s, network_case) => violation_l)
