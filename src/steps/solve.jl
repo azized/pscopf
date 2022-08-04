@@ -52,13 +52,19 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
     max_add_per_iter = get_config("MAX_ADD_RSO_CSTR_PER_ITER") < 0 ? length(get_rso_combinations(model_container)) : get_config("MAX_ADD_RSO_CSTR_PER_ITER")
 
     violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
+    timed_l = @timed  begin
+        p_values_lim = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_p_injected(model_container, Networks.LIMITABLE))], keys(get_p_injected(model_container, Networks.LIMITABLE))))
+        p_values_pil = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_p_injected(model_container, Networks.PILOTABLE))], keys(get_p_injected(model_container, Networks.PILOTABLE))))
+        p_values_lol = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_local_lol(model_container))], keys(get_local_lol(model_container))))
+    end
+    @info @sprintf("creating values container took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
     timed_l = @timed for (branch_id,ts,s,network_case) in get_rso_combinations(model_container)
         # constraint not considered in the model yet
         if !((branch_id,ts,s,network_case) in keys(get_rso_constraints(model_container)))
             branch = Networks.get_branch(network, branch_id)
-            @timeit TIMER_TRACKS "create_or_get_expr" flow_val_l = flow_val(model_container,
-                                    branch, ts, s, network_case,
-                                    uncertainties_at_ech, network)
+            @timeit TIMER_TRACKS "create_or_get_expr" flow_val_l = flow_val(branch, ts, s, network_case,
+                                                                        uncertainties_at_ech, network,
+                                                                        p_values_lim, p_values_pil, p_values_lol)
 
             branch_limit = Networks.safeget_limit(branch, network_case)
             @timeit TIMER_TRACKS "eval_expr" violation_l = max(0., abs(flow_val_l) - branch_limit)

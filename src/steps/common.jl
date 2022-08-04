@@ -1420,6 +1420,39 @@ function flow_val(model_container::AbstractModelContainer,
     return flow_l
 end
 
+function flow_val(branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
+                uncertainties_at_ech, network::Networks.Network,
+                p_values_lim, p_values_pil, p_values_lol)::Float64
+    branch_id = Networks.get_id(branch)
+
+    flow_l = 0.
+    for bus in Networks.get_buses(network)
+        bus_id = Networks.get_id(bus)
+        ptdf = Networks.safeget_ptdf_elt(network, branch_id, bus_id, ptdf_case)
+
+        # + injections limitables
+        for gen in Networks.get_generators_of_type(bus, Networks.LIMITABLE)
+            gen_id = Networks.get_id(gen)
+            flow_l += ptdf * p_values_lim[(gen_id, ts, s)]
+        end
+
+        # + injections pilotables
+        for gen in Networks.get_generators_of_type(bus, Networks.PILOTABLE)
+            gen_id = Networks.get_id(gen)
+            flow_l +=  ptdf * p_values_pil[(gen_id, ts, s)]
+        end
+
+        # - loads
+        flow_l -= ptdf * get_uncertainties(uncertainties_at_ech, bus_id, ts, s)
+
+        # + cutting loads ~ injections
+        flow_l += ptdf * p_values_lol[(bus_id, ts, s)]
+
+    end
+
+    return flow_l
+end
+
 # Helpers
 ##################
 
