@@ -67,8 +67,29 @@ end
 function generate_rso_constraints!(model_container::AbstractModelContainer,
                                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network,
                                 max_add_per_iter)
-    ptdf_l = build_fast_ptdf(network.ptdf)
 
+    ptdf_l = build_fast_ptdf(network.ptdf)
+    violated_combinations = compute_violated_combinations(model_container,uncertainties_at_ech, network, ptdf_l)
+    has_violations = !isempty(violated_combinations)
+
+    @timeit TIMER_TRACKS "sort_violations" violated_combinations_to_add = violations_to_add(violated_combinations, max_add_per_iter)
+
+    # set start values for the next iteration before invalidating the model
+    if !isempty(violated_combinations_to_add)
+        set_start_values!(get_model(model_container))
+    end
+
+    timed_l = @timed add_constraints!(model_container,
+                        violated_combinations_to_add, uncertainties_at_ech, network)
+    @info @sprintf("adding RSO constraints took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+
+    return has_violations
+end
+
+
+function compute_violated_combinations(model_container::AbstractModelContainer,
+                                    uncertainties_at_ech, network, fast_ptdf
+                                    )::Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}
     violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
     timed_l = @timed  begin
         p_values_lim = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_p_injected(model_container, Networks.LIMITABLE))], keys(get_p_injected(model_container, Networks.LIMITABLE))))
@@ -82,7 +103,7 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
             branch = Networks.get_branch(network, branch_id)
             @timeit TIMER_TRACKS "create_or_get_expr" flow_val_l = flow_val(branch, ts, s, network_case,
                                                                         uncertainties_at_ech, network,
-                                                                        p_values_lim, p_values_pil, p_values_lol, ptdf_l)
+                                                                        p_values_lim, p_values_pil, p_values_lol, fast_ptdf)
 
             branch_limit = Networks.safeget_limit(branch, network_case)
             @timeit TIMER_TRACKS "eval_expr" violation_l = max(0., abs(flow_val_l) - branch_limit)
@@ -94,19 +115,21 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
     end
     @info @sprintf("verifying RSO constraint violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
     @info @sprintf("number of violated constraints : %d", length(violated_combinations))
-    has_violations = !isempty(violated_combinations)
 
-    @timeit TIMER_TRACKS "sort_violations" ( sorted_violations::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}} =
-                        sort(collect(violated_combinations), by= x -> x[2], rev=true) )
+    return violated_combinations
+end
+
+function violations_to_add(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
+    #sort by violation
+    sorted_violations = sort(collect(violated_combinations), by= x -> x[2], rev=true)
+
     violated_combinations_to_add = sorted_violations[1: min(max_add_per_iter, length(sorted_violations))]
+    return violated_combinations_to_add
+end
 
-
-    # set start values for the next iteration before invalidating the model
-    if !isempty(violated_combinations_to_add)
-        set_start_values!(get_model(model_container))
-    end
-
-    timed_l = @timed begin
+function add_constraints!(model_container::AbstractModelContainer,
+                        violated_combinations_to_add,
+                        uncertainties_at_ech, network)
     @timeit TIMER_TRACKS "add_cstrs" for ((branch, ts, s, network_case) ,_) in violated_combinations_to_add
         flow_expr_l = flow_expr(model_container,
                                 branch, ts, s, network_case,
@@ -118,8 +141,4 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
                         get_flows(model_container),
                         branch, ts, s, network_case)
     end
-    end
-    @info @sprintf("adding RSO constraints took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
-
-    return has_violations
 end
