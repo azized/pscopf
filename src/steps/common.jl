@@ -1278,8 +1278,7 @@ end
 function add_rso_flows_exprs!(model_container::AbstractModelContainer,
                 combinations_to_add, #container/Generator of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
                 uncertainties_at_ech, network::Networks.Network)
-    for (branch_id, ts, s, ptdf_case) in combinations_to_add
-        branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
+    for (branch, ts, s, ptdf_case) in combinations_to_add
         flow_expr_l = flow_expr(model_container,
                                 branch, ts, s, ptdf_case,
                                 uncertainties_at_ech, network)
@@ -1342,8 +1341,7 @@ function add_rso_constraints!(model_container::AbstractModelContainer,
     model = get_model(model_container)
     rso_constraints = get_rso_constraints(model_container)
     flows = get_flows(model_container)
-    for (branch_id, ts, s, ptdf_case) in combinations_to_add
-        branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
+    for (branch, ts, s, ptdf_case) in combinations_to_add
         add_rso_constraint!(model, rso_constraints,
                         flows,
                         branch, ts, s, ptdf_case,
@@ -1439,8 +1437,8 @@ end
 ##################
 
 function available_combinations(network, target_timepoints, scenarios)
-    return ((branch_id,ts,s,case)
-                for branch_id in map(Networks.get_id, Networks.get_branches(network))
+    return ((branch,ts,s,case)
+                for branch in Networks.get_branches(network)
                 for ts in target_timepoints
                 for s in scenarios
                 for case in Networks.get_cases(network) #if the network does not hold the PTDF data for a case it will be ignored
