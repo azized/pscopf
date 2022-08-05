@@ -11,14 +11,13 @@ function tso_solve!(model_container::AbstractModelContainer,
     else
         @timeit TIMER_TRACKS "tso_modeling" begin
             @timeit TIMER_TRACKS "rso_cstrs" begin
-                rso_combinations = available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))
-                @info @sprintf("adding %d constraints", length(rso_combinations))
+                @info @sprintf("adding %d constraints", sum(1 for iter in available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))))
                 add_rso_flows_exprs!(model_container,
-                                    rso_combinations,
+                                    available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech)),
                                     uncertainties_at_ech,
                                     network)
                 add_rso_constraints!(model_container,
-                                    rso_combinations,
+                                    available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech)),
                                     network)
             end
         end
