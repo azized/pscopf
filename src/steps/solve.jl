@@ -1,3 +1,5 @@
+using SplitApplyCombine
+
 function tso_solve!(model_container::AbstractModelContainer,
                 solve_fct::Base.Callable, configs::AbstractRunnableConfigs,
                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network,
@@ -147,6 +149,16 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
     @info @sprintf("number of violated constraints : %d", length(violated_combinations))
 
     return violated_combinations
+end
+
+function violations_to_add_by_ts(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
+    #sort by violation #Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}
+    violated_combinations_to_add = Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}()
+    for grp in group( pair_combination_violation -> pair_combination_violation[1][2], violated_combinations)
+        sorted_grp_violations = sort(grp, by=pair_combination_violation->pair_combination_violation[2], rev=true)
+        append!(violated_combinations_to_add, sorted_grp_violations[1:min(max_add_per_iter,end)])
+    end
+    return violated_combinations_to_add
 end
 
 function violations_to_add(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
