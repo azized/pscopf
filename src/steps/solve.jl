@@ -98,8 +98,11 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
                                 max_add_per_iter,
                                 consumptions, fast_ptdf)
 
-    violated_combinations = compute_violated_combinations(model_container, consumptions, network, timepoints, scenarios, fast_ptdf)
-    has_violations = !isempty(violated_combinations)
+    @timeit TIMER_TRACKS "compute_violations" begin
+        timed_l = @timed violated_combinations = compute_violated_combinations(model_container, consumptions, network, timepoints, scenarios, fast_ptdf)
+        @info @sprintf("compute_violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+        has_violations = !isempty(violated_combinations)
+    end
 
     @timeit TIMER_TRACKS "sort_violations" violated_combinations_to_add = violations_to_add(violated_combinations, max_add_per_iter)
 
@@ -115,6 +118,48 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
     return has_violations
 end
 
+function compute_p_values_by_bus(model_container,
+                                uncertainties_at_ech, network, timepoints, scenarios
+                                )::Dict{String, Dict{Tuple{DateTime,String}, Float64}}
+    p_values = Dict{String, Dict{Tuple{DateTime,String}, Float64}}()
+
+    timed_l = @timed  begin
+        p_values_lim = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_p_injected(model_container, Networks.LIMITABLE))], keys(get_p_injected(model_container, Networks.LIMITABLE))))
+        p_values_pil = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_p_injected(model_container, Networks.PILOTABLE))], keys(get_p_injected(model_container, Networks.PILOTABLE))))
+        p_values_lol = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_local_lol(model_container))], keys(get_local_lol(model_container))))
+    end
+    @info @sprintf("creating values container took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+
+    timed_l = @timed for (bus_id, bus) in network.buses
+        bus_p_values = get!(p_values, bus_id, Dict{Tuple{DateTime,String}, Float64}())
+
+        for ts in timepoints, s in scenarios
+            bus_p_values[ts,s] = - get_uncertainties(uncertainties_at_ech, bus_id, ts, s)
+            bus_p_values[ts,s] += p_values_lol[(bus_id, ts, s)]
+        end
+
+        for gen in Networks.get_generators(bus)
+            gen_id = get_id(gen)
+            gen_type = get_type(gen)
+
+            if gen_type == LIMITABLE
+                for ts in timepoints, s in scenarios
+                    bus_p_values[ts,s] += p_values_lim[(gen_id, ts, s)]
+                end
+            end
+
+            if gen_type == PILOTABLE
+                for ts in timepoints, s in scenarios
+                    bus_p_values[ts,s] += p_values_pil[(gen_id, ts, s)]
+                end
+            end
+        end
+
+    end
+    @info @sprintf("creating p_values by bus took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+
+    return p_values
+end
 
 function compute_violated_combinations(model_container::AbstractModelContainer,
                                     uncertainties_at_ech, network,
@@ -122,29 +167,31 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
                                     fast_ptdf
                                     )::Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}
     violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
-    timed_l = @timed  begin
-        p_values_lim = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_p_injected(model_container, Networks.LIMITABLE))], keys(get_p_injected(model_container, Networks.LIMITABLE))))
-        p_values_pil = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_p_injected(model_container, Networks.PILOTABLE))], keys(get_p_injected(model_container, Networks.PILOTABLE))))
-        p_values_lol = value.(JuMP.Containers.DenseAxisArray([v for v in values(get_local_lol(model_container))], keys(get_local_lol(model_container))))
-    end
-    @info @sprintf("creating values container took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
-    timed_l = @timed for (branch_id,ts,s,network_case) in available_combinations(network, timepoints, scenarios)
-        # constraint not considered in the model yet
-        if !((branch_id,ts,s,network_case) in keys(get_rso_constraints(model_container)))
-            branch = Networks.get_branch(network, branch_id)
-            @timeit TIMER_TRACKS "create_or_get_expr" flow_val_l = flow_val(branch, ts, s, network_case,
-                                                                        uncertainties_at_ech, network,
-                                                                        p_values_lim, p_values_pil, p_values_lol, fast_ptdf)
 
-            branch_limit = Networks.safeget_limit(branch, network_case)
-            @timeit TIMER_TRACKS "eval_expr" violation_l = max(0., abs(flow_val_l) - branch_limit)
-            if violation_l > 0
-                # store violated combinations to add constraints later, not to invalidate the model now
-                push!(violated_combinations, (branch, ts, s, network_case) => violation_l)
+    p_values = compute_p_values_by_bus(model_container, uncertainties_at_ech, network, timepoints, scenarios)
+
+    timed_l = @timed begin
+        flows_l = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}(combination => 0. for combination in available_combinations(network, timepoints, scenarios))
+        for ((network_case, branch_id, bus_id), ptdf_val_l) in fast_ptdf
+            branch = get_branch(network, branch_id)
+            for ((ts,s), p_val) in p_values[bus_id]
+                # if !((branch_id,ts,s,network_case) in keys(get_rso_constraints(model_container)))
+                flows_l[branch,ts,s,network_case] += p_val * ptdf_val_l
             end
         end
     end
+    @info @sprintf("computing flows took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+
+    timed_l = @timed for ((branch,ts,s,network_case),flow_val) in flows_l
+        branch_limit = Networks.safeget_limit(branch, network_case)
+        violation_l = max(0., abs(flow_val) - branch_limit)
+        if violation_l > 1e-09
+            # store violated combinations to add constraints later, not to invalidate the model now
+            push!(violated_combinations, (branch, ts, s, network_case) => violation_l)
+        end
+    end
     @info @sprintf("verifying RSO constraint violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+
     @info @sprintf("number of violated constraints : %d", length(violated_combinations))
 
     return violated_combinations
