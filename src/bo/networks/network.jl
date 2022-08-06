@@ -6,7 +6,7 @@ PTDFDict = SortedDict{String, PTDFValues}
 BASECASE = "BASECASE"
 
 struct Network
-    name::String
+    id::String
     # Direct access containers
     buses::SortedDict{String, Bus}
     branches::SortedDict{String, Branch}
@@ -18,8 +18,8 @@ struct Network
     ptdf::PTDFDict
 
     # Constructor
-    function Network(name::String)
-        return new( name
+    function Network(id::String)
+        return new( id
                   , SortedDict{String, Bus}()
                   , SortedDict{String, Branch}()
                   , SortedDict{String, Generator}()
@@ -38,7 +38,7 @@ end
 
 function add_new_bus!(network::Network, bus_id::String)
     if haskey(network.buses,bus_id)
-        throw( error("Bus with id ", bus_id, " already exists in Network ", network.name) )
+        throw( error("Bus with id ", bus_id, " already exists in Network ", network.id) )
     end
     bus = Bus(bus_id)
     network.buses[bus_id] = bus
@@ -53,7 +53,7 @@ end
 function add_bus!(network::Network, bus::Bus)
     bus_id = bus.id
     if haskey(network.buses,bus_id)
-        throw( error("Bus with id ", bus_id, " already exists in Network ", network.name) )
+        throw( error("Bus with id ", bus_id, " already exists in Network ", network.id) )
     end
     network.buses[bus_id] = bus
 end
@@ -77,7 +77,7 @@ function safeget_bus(network::Network, bus_id::String)::Bus
     if !isequal(bus, missing)
         return bus
     else
-        throw( error("Bus with id ", bus_id, " does not exist in Network ", network.name) )
+        throw( error("Bus with id ", bus_id, " does not exist in Network ", network.id) )
     end
 end
 
@@ -87,6 +87,10 @@ end
 
 function get_nb_buses(network::Network)::Int
     return length(network.buses)
+end
+
+function get_nb_branches(network::Network)::Int
+    return length(network.branches)
 end
 
 ############
@@ -148,7 +152,7 @@ function safeget_branch(network::Network, branch_id::String)::Branch
     if !isequal(branch, missing)
         return branch
     else
-        throw( error("Branch ", branch_id, " does not exist in Network ", network.name) )
+        throw( error("Branch ", branch_id, " does not exist in Network ", network.id) )
     end
 end
 
@@ -199,7 +203,7 @@ function safeget_generator(network::Network, generator_id::String)
     if !isequal(generator, missing)
         return generator
     else
-        throw( error("Generator with id ", generator_id, " does not exist in Network ", network.name) )
+        throw( error("Generator with id ", generator_id, " does not exist in Network ", network.id) )
     end
 end
 
@@ -229,6 +233,10 @@ end
 
 function get_cases(network::Network)
     return keys(network.ptdf)
+end
+
+function get_nb_network_cases(network::Network)::Int
+    return length(network.ptdf)
 end
 
 """
@@ -364,7 +372,7 @@ end
 function safeget_generator_or_bus(network::Network, id::String)
     generator_or_bus::Union{Generator, Bus, Missing} = get_generator_or_bus(network, id)
     if ismissing(generator_or_bus)
-        throw( error("No Generator or Bus with id `", id, "` exists in Network ", network.name) )
+        throw( error("No Generator or Bus with id `", id, "` exists in Network ", network.id) )
     else
         return generator_or_bus
     end

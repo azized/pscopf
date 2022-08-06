@@ -166,6 +166,7 @@ end
 function run!(context_p::AbstractContext, sequence_p::Sequence;
                 check_context=true)
     init!(context_p, sequence_p, check_context)
+    summarize_instance(context_p)
 
     for (steps_index, (ech, steps_at_ech)) in enumerate(get_operations(sequence_p))
         @info("-"^50)
@@ -374,4 +375,16 @@ function log_nb_rso_cstrs(logfile::String,
             end
         end
     end
+end
+
+
+function summarize_instance(context_p::PSCOPFContext)
+    network = get_network(context_p)
+    @info @sprintf("launching on network %s", get_id(network))
+    @info @sprintf("network contains %d buses and %d branches", get_nb_buses(network), get_nb_branches(network))
+    @info @sprintf("%d network cases will be considered", get_nb_network_cases(network))
+    TS = get_target_timepoints(context_p)
+    @info @sprintf("for %d timepoints : %s", length(TS), TS)
+    S = get_scenarios(context_p)
+    @info @sprintf("for %d scenarios : %s", length(S), S)
 end
