@@ -38,6 +38,16 @@ function build_fast_ptdf(ptdf::PTDFDict)
     return result_ptdf
 end
 
+function build_fast_branches(branches::SortedDict{String, Networks.Branch})
+    result_limits = Dict{Tuple{String, String}, Tuple{Networks.Branch, Float64}}()
+    for (branch_id, branch) in branches
+        for (network_case, val_limit) in get_limit(branch)
+            result_limits[branch_id, network_case] = (branch, val_limit)
+        end
+    end
+    return result_limits
+end
+
 function build_fast_access_consumptions(uncertainties_at_ech, network)
     result = Dict{Tuple{String, DateTime, String}, Float64}()
     for (injection_id, injection_uncertainties) in uncertainties_at_ech
@@ -64,8 +74,9 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
                                         uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network)
     timepoints = get_target_timepoints(uncertainties_at_ech)
     scenarios = get_scenarios(uncertainties_at_ech)
-    consumptions = build_fast_access_consumptions(uncertainties_at_ech, network)
-    ptdf_l = build_fast_ptdf(network.ptdf)
+    consumptions = build_fast_access_consumptions(uncertainties_at_ech, network) #TODO : compute once directly as base flows
+    ptdf_l = build_fast_ptdf(network.ptdf) #TODO : once early on
+    fast_branches_l = build_fast_branches(network.branches) #TODO : once early on
 
     did_add_constraints = true
     while(did_add_constraints)
@@ -84,7 +95,7 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
                                                                                                 uncertainties_at_ech, network,
                                                                                                 timepoints, scenarios,
                                                                                                 max_add_per_iter,
-                                                                                                consumptions, ptdf_l)
+                                                                                                consumptions, ptdf_l, fast_branches_l)
     end
 
     @info @sprintf("Dynamically added %d constraints out of %d possible combinations\n",
@@ -96,10 +107,10 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
                                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network,
                                 timepoints, scenarios,
                                 max_add_per_iter,
-                                consumptions, fast_ptdf)
+                                consumptions, fast_ptdf, fast_branches_l)
 
     @timeit TIMER_TRACKS "compute_violations" begin
-        timed_l = @timed violated_combinations = compute_violated_combinations(model_container, consumptions, network, timepoints, scenarios, fast_ptdf)
+        timed_l = @timed violated_combinations = compute_violated_combinations(model_container, consumptions, network, timepoints, scenarios, fast_ptdf, fast_branches_l)
         @info @sprintf("compute_violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
         has_violations = !isempty(violated_combinations)
     end
@@ -164,30 +175,29 @@ end
 function compute_violated_combinations(model_container::AbstractModelContainer,
                                     uncertainties_at_ech, network,
                                     timepoints, scenarios,
-                                    fast_ptdf
+                                    fast_ptdf, fast_branches_l
                                     )::Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}
     violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
 
     p_values = compute_p_values_by_bus(model_container, uncertainties_at_ech, network, timepoints, scenarios)
 
     timed_l = @timed begin
-        flows_l = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}(combination => 0. for combination in available_combinations(network, timepoints, scenarios))
+        flows_l = Dict{Tuple{String,DateTime,String,String}, Float64}(combination => 0. for combination in available_combinations(network, timepoints, scenarios))
         for ((network_case, branch_id, bus_id), ptdf_val_l) in fast_ptdf
-            branch = get_branch(network, branch_id)
             for ((ts,s), p_val) in p_values[bus_id]
                 # if !((branch_id,ts,s,network_case) in keys(get_rso_constraints(model_container)))
-                flows_l[branch,ts,s,network_case] += p_val * ptdf_val_l
+                flows_l[branch_id,ts,s,network_case] += p_val * ptdf_val_l
             end
         end
     end
     @info @sprintf("computing flows took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
 
-    timed_l = @timed for ((branch,ts,s,network_case),flow_val) in flows_l
-        branch_limit = Networks.safeget_limit(branch, network_case)
+    timed_l = @timed for ((branch_id,ts,s,network_case),flow_val) in flows_l
+        branch_limit = fast_branches_l[branch_id, network_case][2]
         violation_l = max(0., abs(flow_val) - branch_limit)
         if violation_l > 1e-09
             # store violated combinations to add constraints later, not to invalidate the model now
-            push!(violated_combinations, (branch, ts, s, network_case) => violation_l)
+            push!(violated_combinations, (fast_branches_l[branch_id, network_case][1], ts, s, network_case) => violation_l)
         end
     end
     @info @sprintf("verifying RSO constraint violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
