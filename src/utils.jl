@@ -161,3 +161,13 @@ produce a filename compatible with windows platform (win does not accept ":" in 
 function valid_filename(filename_p::String)
     return replace(filename_p, ":"=>"_")
 end
+
+
+"""
+if pattern occurs in str, returns the str[first occurence of pattern :end]
+else returns str
+"""
+function substring_from(str, pattern)
+    index = findfirst(pattern, str)
+    return str[(isnothing(index) ? 1 : first(index)) : end]
+end

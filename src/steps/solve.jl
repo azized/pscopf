@@ -4,26 +4,43 @@ function tso_solve!(model_container::AbstractModelContainer,
                 solve_fct::Base.Callable, configs::AbstractRunnableConfigs,
                 uncertainties_at_ech::UncertaintiesAtEch, network::Networks.Network,
                 dynamic_solving::Bool)
-    if dynamic_solving
-        @info "dynamic solve"
-        @timeit TIMER_TRACKS "tso_dynamic_solve" iterative_solve_on_rso_constraints!(model_container,
-                                                                            solve_fct, configs, uncertainties_at_ech, network)
-    else
-        @timeit TIMER_TRACKS "tso_modeling" begin
-            @timeit TIMER_TRACKS "rso_cstrs" begin
-                @info @sprintf("adding %d constraints", sum(1 for iter in available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))))
-                add_rso_flows_exprs!(model_container,
-                                    available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech)),
-                                    uncertainties_at_ech,
-                                    network)
-                add_rso_constraints!(model_container,
-                                    available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech)),
-                                    network)
+    full_solve_timed_l = @timed begin
+        if dynamic_solving
+            @info "dynamic solve"
+            @timeit TIMER_TRACKS "tso_dynamic_solve" iterative_solve_on_rso_constraints!(model_container,
+                                                                                solve_fct, configs, uncertainties_at_ech, network)
+        else
+            @timeit TIMER_TRACKS "tso_modeling" begin
+                @timeit TIMER_TRACKS "rso_cstrs" begin
+                    @info @sprintf("adding %d constraints", sum(1 for iter in available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))))
+                    add_rso_flows_exprs!(model_container,
+                                        available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech)),
+                                        uncertainties_at_ech,
+                                        network)
+                    add_rso_constraints!(model_container,
+                                        available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech)),
+                                        network)
+                end
             end
+            @info "tso_solve!: actual solve"
+            @timeit TIMER_TRACKS "tso_solve" solve_fct(model_container, configs)
+            TSO_SOLVE_RECORDS.nb_iters = 1
         end
-        @info "tso_solve!: actual solve"
-        @timeit TIMER_TRACKS "tso_solve" solve_fct(model_container, configs)
     end
+
+    #TODO : avoid hardcode
+    TSO_SOLVE_RECORDS.usecase = substring_from(filter(!isspace, configs.out_path), "pscopf")
+    TSO_SOLVE_RECORDS.dynamic = dynamic_solving
+    TSO_SOLVE_RECORDS.nb_added_constraints = length(get_rso_constraints(model_container))
+    TSO_SOLVE_RECORDS.nb_total_constraints = theoretical_nb_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))
+    TSO_SOLVE_RECORDS.total_cstr_generation_time = TimerOutputs.ncalls(dynamic_solving ?
+                                                                    TIMER_TRACKS["run_model"]["tso_dynamic_solve"]["generate_rso_cstrs"] :
+                                                                    TIMER_TRACKS["run_model"]["tso_modeling"]["rso_cstrs"] )
+    TSO_SOLVE_RECORDS.total_solving_time = full_solve_timed_l.time
+    TSO_SOLVE_RECORDS.total_cstr_generation_time = TimerOutputs.time(dynamic_solving ?
+                                                                    TIMER_TRACKS["run_model"]["tso_dynamic_solve"]["generate_rso_cstrs"] :
+                                                                    TIMER_TRACKS["run_model"]["tso_modeling"]["rso_cstrs"]) /1e9
+    write_record!(TSO_SOLVE_RECORDS)
 end
 
 function build_fast_ptdf(ptdf::PTDFDict)
@@ -82,7 +99,7 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
     while(did_add_constraints)
         @info @sprintf("dynamic solve: handling %d constraints out of %d\n",
             length(get_rso_constraints(model_container)), theoretical_nb_combinations(network, timepoints, scenarios))
-        solve_fct(model_container, configs)
+        solver_timed_l = @timed solve_fct(model_container, configs)
 
         # model is infeasible, adding constraints will not solve the issue
         if get_status(model_container) in [pscopf_INFEASIBLE, pscopf_HAS_SLACK]
@@ -96,8 +113,14 @@ function iterative_solve_on_rso_constraints!(model_container::AbstractModelConta
                                                                                                 timepoints, scenarios,
                                                                                                 max_add_per_iter,
                                                                                                 consumptions, ptdf_l, fast_branches_l)
+
+        DYNAMIC_SOLVE_RECORDS.nb_added_constraints = length(get_rso_constraints(model_container))
+        DYNAMIC_SOLVE_RECORDS.nb_total_constraints = theoretical_nb_combinations(network, timepoints, scenarios)
+        DYNAMIC_SOLVE_RECORDS.solver_time = solver_timed_l.time
+        write_record!(DYNAMIC_SOLVE_RECORDS)
     end
 
+    TSO_SOLVE_RECORDS.nb_iters = DYNAMIC_SOLVE_RECORDS.iter
     @info @sprintf("Dynamically added %d constraints out of %d possible combinations\n",
             length(get_rso_constraints(model_container)), theoretical_nb_combinations(network, timepoints, scenarios))
 end
@@ -113,18 +136,24 @@ function generate_rso_constraints!(model_container::AbstractModelContainer,
         timed_l = @timed violated_combinations = compute_violated_combinations(model_container, consumptions, network, timepoints, scenarios, fast_ptdf, fast_branches_l)
         @info @sprintf("compute_violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
         has_violations = !isempty(violated_combinations)
+
+        DYNAMIC_SOLVE_RECORDS.nb_violated_constraints = length(violated_combinations)
     end
 
-    @timeit TIMER_TRACKS "sort_violations" violated_combinations_to_add = violations_to_add(violated_combinations, max_add_per_iter)
-
     # set start values for the next iteration before invalidating the model
-    if !isempty(violated_combinations_to_add)
+    if !isempty(violated_combinations)
         set_start_values!(get_model(model_container))
+    end
+
+    @timeit TIMER_TRACKS "sort_violations" begin
+        violations_filtering_time_l = @timed violated_combinations_to_add = violations_to_add(violated_combinations, max_add_per_iter)
     end
 
     timed_l = @timed add_constraints!(model_container,
                         violated_combinations_to_add, uncertainties_at_ech, network)
     @info @sprintf("adding RSO constraints took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+
+    DYNAMIC_SOLVE_RECORDS.violations_filtering_time = violations_filtering_time_l.time
 
     return has_violations
 end
@@ -181,7 +210,7 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
 
     p_values = compute_p_values_by_bus(model_container, uncertainties_at_ech, network, timepoints, scenarios)
 
-    timed_l = @timed begin
+    flow_computation_time_l = @timed begin
         flows_l = Dict{Tuple{String,DateTime,String,String}, Float64}(combination => 0. for combination in available_combinations(network, timepoints, scenarios))
         for ((network_case, branch_id, bus_id), ptdf_val_l) in fast_ptdf
             for ((ts,s), p_val) in p_values[bus_id]
@@ -190,9 +219,9 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
             end
         end
     end
-    @info @sprintf("computing flows took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+    @info @sprintf("computing flows took %s s and allocated %s kB", flow_computation_time_l.time, (flow_computation_time_l.bytes/1024))
 
-    timed_l = @timed for ((branch_id,ts,s,network_case),flow_val) in flows_l
+    flow_verification_time_l = @timed for ((branch_id,ts,s,network_case),flow_val) in flows_l
         branch_limit = fast_branches_l[branch_id, network_case][2]
         violation_l = max(0., abs(flow_val) - branch_limit)
         if violation_l > 1e-09
@@ -200,9 +229,12 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
             push!(violated_combinations, (fast_branches_l[branch_id, network_case][1], ts, s, network_case) => violation_l)
         end
     end
-    @info @sprintf("verifying RSO constraint violations took %s s and allocated %s kB", timed_l.time, (timed_l.bytes/1024))
+    @info @sprintf("verifying RSO constraint violations took %s s and allocated %s kB", flow_verification_time_l.time, (flow_verification_time_l.bytes/1024))
 
     @info @sprintf("number of violated constraints : %d", length(violated_combinations))
+
+    DYNAMIC_SOLVE_RECORDS.flow_computation_time = flow_computation_time_l.time
+    DYNAMIC_SOLVE_RECORDS.flow_verification_time = flow_verification_time_l.time
 
     return violated_combinations
 end

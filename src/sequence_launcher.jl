@@ -167,6 +167,8 @@ function run!(context_p::AbstractContext, sequence_p::Sequence;
                 check_context=true)
     init!(context_p, sequence_p, check_context)
     summarize_instance(context_p)
+    init!(DYNAMIC_SOLVE_RECORDS, context_p.out_dir, "dynamicSolve.log", false)
+    init!(TSO_SOLVE_RECORDS, ".", "tsoSolve.log", true)
 
     for (steps_index, (ech, steps_at_ech)) in enumerate(get_operations(sequence_p))
         @info("-"^50)
@@ -353,8 +355,7 @@ function log_nb_rso_cstrs(logfile::String,
                         nb_possible_combinations::Int,
                         outdir::String, ech::DateTime)
     #TODO : avoid hardcode
-    index = findfirst("pscopf", lowercase(outdir))
-    usecase_name = outdir[(isnothing(index) ? 1 : first(index)) : end]
+    usecase_name = substring_from(outdir, "pscopf")
     if filesize(logfile) == 0
         open(logfile, "w") do file_l
             Base.write(file_l, "#usecase dynamic? model ech status added_rso_cstrs total_rso_cstrs ratio_cstrs LoL\n")
