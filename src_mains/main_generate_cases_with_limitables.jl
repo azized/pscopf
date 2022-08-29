@@ -34,12 +34,12 @@ MATPOWER_NETWORKS = [
     # "case14",
     # "case24_ieee_rts",
     "case30",
-    # "case30pwl",
-    # "case30Q",
-    # "case39",
+    "case30pwl",
+    "case30Q",
+    "case39",
     "case57",
     "case89pegase",
-    "case118",
+    # "case118",
     # "case145",
     # "case300",
     # "case1354pegase",
@@ -444,7 +444,7 @@ pilotables_templates = [
     PilotableTemplate("_2h",   50., 300.,  100., 20.,  Second(Hour(2)),    Second(Minute(15)))
     PilotableTemplate("_4h",   50., 600.,  150., 15.,  Second(Hour(4)),    Second(Minute(15)))
 ]
-nb_generators_probabilities = [.25, .2, .25, .1, .05] #no_generator_proba : 0.15
+nb_generators_probabilities = [.25, .2, .15, .05, .05] #no_generator_proba : 0.3
 @assert (length(nb_generators_probabilities) == length(pilotables_templates))
 
 
@@ -453,7 +453,7 @@ limitables_templates = [
     LimitableTemplate("_70",   70., 2., Second(Minute(15)), Second(Minute(15)))
     LimitableTemplate("_100", 100., 3., Second(Minute(15)), Second(Minute(15)))
 ]
-limitable_templates_probabilities = [0.2, 0.3, 0.2] # => no_limitable_proba : 0.3
+limitable_templates_probabilities = [0.2, 0.1, 0.2] # => no_limitable_proba : 0.5
 
 
 # Base Uncertainties
@@ -480,11 +480,14 @@ prediction_error = 0.01
 #################################################################################################################
 # Launch
 #################################################################################################################
+
+PSCOPF.init!(PSCOPF.DYNAMIC_SOLVE_RECORDS, ".", "_dynamicSolve.log", false)
+PSCOPF.init!(PSCOPF.TSO_SOLVE_RECORDS, ".", "_tsoSolve.log", true)
+
 # ENV["JULIA_DEBUG"] = PSCOPF
-for matpower_case in ["case4gs"]#MATPOWER_NETWORKS
+for matpower_case in MATPOWER_NETWORKS
     @info matpower_case
-    input_path = ( length(ARGS) > 0 ? ARGS[1] :
-                        joinpath(@__DIR__, "..", "data_matpower", matpower_case) )
+    input_path = joinpath(@__DIR__, "..", "data_matpower", matpower_case)
     output_folder = joinpath(@__DIR__, "..", "data", matpower_case*"_WIND")
 
     logfile = PSCOPF.get_config("TEMP_GLOBAL_LOGFILE")
@@ -494,6 +497,7 @@ for matpower_case in ["case4gs"]#MATPOWER_NETWORKS
         write(file_l, @sprintf("n-1? : %s\n", PSCOPF.get_config("CONSIDER_N_1")))
     end
 
+    # PSCOPF.set_config!("ADD_RSO_CSTR_DYNAMICALLY", true)
     time_generation = @elapsed (generated_network, gen_init, uncertainties), (time_ptdf, time_free_flows) =
                                 main_instance_generate(input_path,
                                     ref_bus_num, distributed,
