@@ -239,22 +239,67 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
     return violated_combinations
 end
 
+function violations_to_add_by_ts_group(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
+    println(max_add_per_iter)
+    #max_violations[ts][branch,s] => (violation, network_case)
+    dict_max_violations = Dict{DateTime, Dict{Tuple{Networks.Branch,String},Tuple{Float64,String}}}()
+
+    for ((br,ts,s,nc), val) in violated_combinations
+        dict_max_violations_at_ts = get!(dict_max_violations, ts,
+                                        Dict{Tuple{Networks.Branch,String},Tuple{Float64,String}}())
+        if val > get(dict_max_violations_at_ts, (br,s), (0.,nothing))[1]
+            dict_max_violations_at_ts[br,s] = (val, nc)
+        end
+    end
+
+    dict_sorted_max_violations = Dict{DateTime, Vector{Pair{Tuple{Networks.Branch,String},Tuple{Float64,String}}}}()
+    for (ts, dict_max_violations_at_ts) in dict_max_violations
+        println(ts)
+        dict_sorted_max_violations[ts] = sort(collect(dict_max_violations_at_ts),
+                                            by=x->x[2][1], rev=true)
+    end
+
+    violated_combinations_to_add = Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}()
+    for (ts, sorted_violations_at_ts) in dict_sorted_max_violations
+        for ((branch,s),(val, case)) in sorted_violations_at_ts[1:min(end, max_add_per_iter)]
+            push!(violated_combinations_to_add, (branch,ts,s,case) => val)
+        end
+    end
+
+    println("TOADD: \n", violated_combinations_to_add)
+    return violated_combinations_to_add
+end
+
 function violations_to_add_by_ts(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
     #sort by violation #Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}
     violated_combinations_to_add = Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}()
-    for grp in group( pair_combination_violation -> pair_combination_violation[1][2], violated_combinations)
-        sorted_grp_violations = sort(grp, by=pair_combination_violation->pair_combination_violation[2], rev=true)
+    by_ts = pair_combination_violation -> pair_combination_violation[1][2]
+    by_violation = pair_combination_violation -> pair_combination_violation[2]
+    for grp in group( by_ts, violated_combinations)
+        sorted_grp_violations = sort(grp, by=by_violation, rev=true)
         append!(violated_combinations_to_add, sorted_grp_violations[1:min(max_add_per_iter,end)])
     end
     return violated_combinations_to_add
 end
 
-function violations_to_add(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
+function violations_to_add_by_highest(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
     #sort by violation
     sorted_violations = sort(collect(violated_combinations), by= x -> x[2], rev=true)
 
     violated_combinations_to_add = sorted_violations[1: min(max_add_per_iter, length(sorted_violations))]
     return violated_combinations_to_add
+end
+
+function violations_to_add(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
+    if (get_config("VIOLATIONS_ADD_FUNCTION") == "HIGHEST")
+        return violations_to_add_by_highest(violated_combinations, max_add_per_iter)
+    elseif (get_config("VIOLATIONS_ADD_FUNCTION") == "TS")
+        return violations_to_add_by_ts(violated_combinations, max_add_per_iter)
+    elseif (get_config("VIOLATIONS_ADD_FUNCTION") == "TS_GROUP")
+        return violations_to_add_by_ts_group(violated_combinations, max_add_per_iter)
+    else
+        error("unrecognized violations adding function "*get_config("VIOLATIONS_ADD_FUNCTION"))
+    end
 end
 
 function add_constraints!(model_container::AbstractModelContainer,

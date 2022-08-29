@@ -33,6 +33,7 @@ function init_logging(filepath_p)
     end
 
     log_file = endswith(filepath_p, ".log") ? filepath_p : filepath_p * ".log"
+    mkpath(dirname(log_file))
     file_logger = Logging.ConsoleLogger(open(log_file, "w"), Logging.Debug, meta_formatter=logger_metafmt)
     #file_logger = LoggingExtras.MinLevelLogger(LoggingExtras.FileLogger(log_file), Logging.Debug) #print souce_info at each log line
     logger = LoggingExtras.TeeLogger(Logging.current_logger(), file_logger)
