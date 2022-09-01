@@ -171,6 +171,10 @@ function get_branches(network::Network)
     return values(network.branches)
 end
 
+function get_branches_ids(network::Network)
+    return keys(network.branches)
+end
+
 
 ########################
 ##      Generator     ##

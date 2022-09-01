@@ -201,12 +201,10 @@ function compute_p_values_by_bus(model_container,
     return p_values
 end
 
-function compute_violated_combinations(model_container::AbstractModelContainer,
-                                    uncertainties_at_ech, network,
-                                    timepoints, scenarios,
-                                    fast_ptdf, fast_branches_l
-                                    )::Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}
-    violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
+function compute_flows(model_container,
+                    uncertainties_at_ech, network,
+                    timepoints, scenarios,
+                    fast_ptdf)
 
     p_values = compute_p_values_by_bus(model_container, uncertainties_at_ech, network, timepoints, scenarios)
 
@@ -221,6 +219,20 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
     end
     @info @sprintf("computing flows took %s s and allocated %s kB", flow_computation_time_l.time, (flow_computation_time_l.bytes/1024))
 
+    DYNAMIC_SOLVE_RECORDS.flow_computation_time = flow_computation_time_l.time
+
+    return flows_l
+end
+
+function compute_violated_combinations(model_container::AbstractModelContainer,
+                                    uncertainties_at_ech, network,
+                                    timepoints, scenarios,
+                                    fast_ptdf, fast_branches_l
+                                    )::Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}
+    violated_combinations = Dict{Tuple{Networks.Branch,DateTime,String,String}, Float64}()
+
+    flows_l = compute_flows(model_container, uncertainties_at_ech, network, timepoints, scenarios, fast_ptdf)
+
     flow_verification_time_l = @timed for ((branch_id,ts,s,network_case),flow_val) in flows_l
         branch_limit = fast_branches_l[branch_id, network_case][2]
         violation_l = max(0., abs(flow_val) - branch_limit)
@@ -233,7 +245,6 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
 
     @info @sprintf("number of violated constraints : %d", length(violated_combinations))
 
-    DYNAMIC_SOLVE_RECORDS.flow_computation_time = flow_computation_time_l.time
     DYNAMIC_SOLVE_RECORDS.flow_verification_time = flow_verification_time_l.time
 
     return violated_combinations
@@ -266,7 +277,6 @@ function violations_to_add_by_ts_group(violated_combinations, max_add_per_iter):
         end
     end
 
-    println("TOADD: \n", violated_combinations_to_add)
     return violated_combinations_to_add
 end
 

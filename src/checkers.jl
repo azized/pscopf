@@ -103,7 +103,8 @@ function check_ptdf_case_entries(ptdf::Networks.PTDFDict, network::Network)::Boo
     missing_entries = setdiff(required_cases, ptdf_cases)
     if !isempty(missing_entries)
         checks = false
-        msg = @sprintf("Missing case entries `%s` in ptdf. This is fine if these are bridges in the network", missing_entries)
+        msg = @sprintf("Missing case entries `%s` in ptdf. This is fine if these are bridges in the network or if N-1 will not be considered",
+                        missing_entries)
         @warn(msg)
     end
 

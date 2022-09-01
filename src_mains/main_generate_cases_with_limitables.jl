@@ -267,10 +267,16 @@ function compute_free_flows(network::PSCOPF.Network, ech, ts, gen_init, uncertai
                                     output_folder)
     result, _ = PSCOPF.run_step!(initial_context, tso, ech, nothing)
 
-    free_flows = SortedDict{Tuple{String,String},Float64}()
-    for ((branch_id,_,_,ptdf_case), flow_expr) in result.flows
-        free_flows[branch_id, ptdf_case] = value(flow_expr)
-    end
+    consumptions = PSCOPF.build_fast_access_consumptions(PSCOPF.get_uncertainties(uncertainties, ech), network)
+    fast_ptdf = PSCOPF.build_fast_ptdf(network.ptdf)
+
+    flows_l = PSCOPF.compute_flows(result,
+                                consumptions, network,
+                                PSCOPF.get_target_timepoints(initial_context),
+                                PSCOPF.get_scenarios(initial_context),
+                                fast_ptdf)
+    free_flows = SortedDict{Tuple{String,String},Float64}( (branch_id,ptdf_case)=>val
+                                                            for ((branch_id,_,_,ptdf_case),val) in flows_l )
 
     return free_flows
 end
@@ -483,12 +489,13 @@ prediction_error = 0.01
 
 PSCOPF.init!(PSCOPF.DYNAMIC_SOLVE_RECORDS, ".", "_dynamicSolve.log", false)
 PSCOPF.init!(PSCOPF.TSO_SOLVE_RECORDS, ".", "_tsoSolve.log", true)
+PSCOPF.set_config!("ADD_RSO_CSTR_DYNAMICALLY", true)
 
 # ENV["JULIA_DEBUG"] = PSCOPF
 for matpower_case in MATPOWER_NETWORKS
     @info matpower_case
     input_path = joinpath(@__DIR__, "..", "data_matpower", matpower_case)
-    output_folder = joinpath(@__DIR__, "..", "data", matpower_case*"_WIND")
+    output_folder = joinpath(@__DIR__, "..", "data", matpower_case*"_WIND3")
 
     logfile = PSCOPF.get_config("TEMP_GLOBAL_LOGFILE")
     open(logfile, "a") do file_l
