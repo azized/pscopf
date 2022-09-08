@@ -1,0 +1,8 @@
+#             REF_BUS        "distributed"
+#                case            branch_id               bus_id                 ptdf
+          "BASECASE"                 "AD"                  "A"         6.666666E-01
+          "BASECASE"                 "AD"                  "B"        -3.333333E-01
+          "BASECASE"                 "AD"                  "D"        -3.333333E-01
+          "BASECASE"                 "DB"                  "A"         3.333333E-01
+          "BASECASE"                 "DB"                  "B"        -6.666666E-01
+          "BASECASE"                 "DB"                  "D"         3.333333E-01
