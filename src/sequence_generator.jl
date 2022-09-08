@@ -90,13 +90,15 @@ function gen_seq_mode2(seq_generator::SequenceGenerator)
             elseif preceding_ech == fo_startpoint
                 add_step!(sequence, EnergyMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=TSO())), ech)
                 add_step!(sequence, TSOBilevel(TSOBilevelConfigs(REF_SCHEDULE_TYPE_IN_TSO=TSO())), ech) #Ref can be market cause it respects the preceding TSO
-                add_step!(sequence, BalanceMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=TSO())), ech)
+                add_step!(sequence, BalanceMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=TSO(),CONSIDER_TSOACTIONS_LIMITATIONS=true,
+                CONSIDER_TSOACTIONS_IMPOSITIONS=true)), ech)
             else
                 add_step!(sequence, EnergyMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=Market())), ech)
                 # NOTE: The TSOBilevel considers the EnergyMarket both as a reference for deltas and for decided schedules
                 #we can keep this cause the EnergyMarket respects the decisions of the previous BalanceMarket
                 add_step!(sequence, TSOBilevel(TSOBilevelConfigs(REF_SCHEDULE_TYPE_IN_TSO=Market())), ech)
-                add_step!(sequence, BalanceMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=Market())), ech)
+                add_step!(sequence, BalanceMarket(EnergyMarketConfigs(REF_SCHEDULE_TYPE=Market(),CONSIDER_TSOACTIONS_LIMITATIONS=true,
+                CONSIDER_TSOACTIONS_IMPOSITIONS=true)), ech)
             end
         elseif first_ts < ech
             msg = @sprintf(("Error when generating sequence: ech (%s) is after target timepoint (%s)."),
