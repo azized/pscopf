@@ -25,24 +25,24 @@ include(joinpath(root_path, "src", "PTDF.jl"));
 
 
 MATPOWER_NETWORKS = [
-    "case4gs",
-    "case5",
+    # "case4gs",
+    # "case5",
     # "case6ww",
-    "case9",
+    # "case9",
     # "case9Q",
     # "case9target",
     # "case14",
     # "case24_ieee_rts",
-    "case30",
-    "case30pwl",
-    "case30Q",
-    "case39",
-    "case57",
-    "case89pegase",
+    # "case30",
+    # "case30pwl",
+    # "case30Q",
+    # "case39",
+    # "case57",
+    # "case89pegase",
     # "case118",
     # "case145",
     # "case300",
-    # "case1354pegase",
+    "case1354pegase",
     # "case13659pegase",
     # "case1888rte",
     # "case1951rte",
@@ -164,6 +164,10 @@ function generate_initial_network(ptdf_network::PTDF.Network,
                                 )::PSCOPF.Networks.Network
     network = PSCOPF.Networks.Network("generated_network")
 
+    #PTDF
+    ######
+    PSCOPF.PSCOPFio.read_ptdf!(network, ptdf_folder)
+
     #Buses
     #######
     buses_ids::Set{String} = Set{String}(bus.name for bus in values(ptdf_network.buses))
@@ -179,10 +183,6 @@ function generate_initial_network(ptdf_network::PTDF.Network,
             PSCOPF.add_new_limit!(network, branch_id, network_case, default_limit)
         end
     end
-
-    #PTDF
-    ######
-    PSCOPF.PSCOPFio.read_ptdf!(network, ptdf_folder)
 
     #Limitables
     ############
@@ -450,7 +450,7 @@ pilotables_templates = [
     PilotableTemplate("_2h",   50., 300.,  100., 20.,  Second(Hour(2)),    Second(Minute(15)))
     PilotableTemplate("_4h",   50., 600.,  150., 15.,  Second(Hour(4)),    Second(Minute(15)))
 ]
-nb_generators_probabilities = [.25, .2, .15, .05, .05] #no_generator_proba : 0.3
+nb_generators_probabilities = [.25, .2, .05, .05, .05] #no_generator_proba : 0.4
 @assert (length(nb_generators_probabilities) == length(pilotables_templates))
 
 
@@ -459,7 +459,7 @@ limitables_templates = [
     LimitableTemplate("_70",   70., 2., Second(Minute(15)), Second(Minute(15)))
     LimitableTemplate("_100", 100., 3., Second(Minute(15)), Second(Minute(15)))
 ]
-limitable_templates_probabilities = [0.2, 0.1, 0.2] # => no_limitable_proba : 0.5
+limitable_templates_probabilities = [0.33, 0.01, 0.01] # => no_limitable_proba : 0.65
 
 
 # Base Uncertainties

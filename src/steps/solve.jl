@@ -12,7 +12,7 @@ function tso_solve!(model_container::AbstractModelContainer,
         else
             @timeit TIMER_TRACKS "tso_modeling" begin
                 @timeit TIMER_TRACKS "rso_cstrs" begin
-                    @info @sprintf("adding %d constraints", sum(1 for iter in available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))))
+                    # @info @sprintf("adding %d constraints", sum(1 for iter in available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))))
                     add_rso_flows_exprs!(model_container,
                                         available_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech)),
                                         uncertainties_at_ech,
@@ -29,18 +29,20 @@ function tso_solve!(model_container::AbstractModelContainer,
     end
 
     #TODO : avoid hardcode
-    TSO_SOLVE_RECORDS.usecase = substring_from(filter(!isspace, configs.out_path), "pscopf")
-    TSO_SOLVE_RECORDS.dynamic = dynamic_solving
-    TSO_SOLVE_RECORDS.nb_added_constraints = length(get_rso_constraints(model_container))
-    TSO_SOLVE_RECORDS.nb_total_constraints = theoretical_nb_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))
-    TSO_SOLVE_RECORDS.total_cstr_generation_time = TimerOutputs.ncalls(dynamic_solving ?
-                                                                    TIMER_TRACKS["run_model"]["tso_dynamic_solve"]["generate_rso_cstrs"] :
-                                                                    TIMER_TRACKS["run_model"]["tso_modeling"]["rso_cstrs"] )
-    TSO_SOLVE_RECORDS.total_solving_time = full_solve_timed_l.time
-    TSO_SOLVE_RECORDS.total_cstr_generation_time = TimerOutputs.time(dynamic_solving ?
-                                                                    TIMER_TRACKS["run_model"]["tso_dynamic_solve"]["generate_rso_cstrs"] :
-                                                                    TIMER_TRACKS["run_model"]["tso_modeling"]["rso_cstrs"]) /1e9
-    write_record!(TSO_SOLVE_RECORDS)
+    if get_config("EXTRA_LOG") 
+        TSO_SOLVE_RECORDS.usecase = substring_from(filter(!isspace, configs.out_path), "pscopf")
+        TSO_SOLVE_RECORDS.dynamic = dynamic_solving
+        TSO_SOLVE_RECORDS.nb_added_constraints = length(get_rso_constraints(model_container))
+        TSO_SOLVE_RECORDS.nb_total_constraints = theoretical_nb_combinations(network, get_target_timepoints(uncertainties_at_ech), get_scenarios(uncertainties_at_ech))
+        TSO_SOLVE_RECORDS.total_cstr_generation_time = TimerOutputs.ncalls(dynamic_solving ?
+                                                                        TIMER_TRACKS["run_model"]["tso_dynamic_solve"]["generate_rso_cstrs"] :
+                                                                        TIMER_TRACKS["run_model"]["tso_modeling"]["rso_cstrs"] )
+        TSO_SOLVE_RECORDS.total_solving_time = full_solve_timed_l.time
+        TSO_SOLVE_RECORDS.total_cstr_generation_time = TimerOutputs.time(dynamic_solving ?
+                                                                        TIMER_TRACKS["run_model"]["tso_dynamic_solve"]["generate_rso_cstrs"] :
+                                                                        TIMER_TRACKS["run_model"]["tso_modeling"]["rso_cstrs"]) /1e9
+        write_record!(TSO_SOLVE_RECORDS)
+    end
 end
 
 function build_fast_ptdf(ptdf::PTDFDict)
@@ -251,7 +253,6 @@ function compute_violated_combinations(model_container::AbstractModelContainer,
 end
 
 function violations_to_add_by_ts_group(violated_combinations, max_add_per_iter)::Vector{Pair{Tuple{Networks.Branch,DateTime,String,String}, Float64}}
-    println(max_add_per_iter)
     #max_violations[ts][branch,s] => (violation, network_case)
     dict_max_violations = Dict{DateTime, Dict{Tuple{Networks.Branch,String},Tuple{Float64,String}}}()
 
@@ -265,7 +266,6 @@ function violations_to_add_by_ts_group(violated_combinations, max_add_per_iter):
 
     dict_sorted_max_violations = Dict{DateTime, Vector{Pair{Tuple{Networks.Branch,String},Tuple{Float64,String}}}}()
     for (ts, dict_max_violations_at_ts) in dict_max_violations
-        println(ts)
         dict_sorted_max_violations[ts] = sort(collect(dict_max_violations_at_ts),
                                             by=x->x[2][1], rev=true)
     end

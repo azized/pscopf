@@ -21,11 +21,13 @@ function write_header(records_table::RecordsWriter)
 end
 
 function write_record(records_table::RecordsWriter)
-    println("WRITING :", formatted_record(records_table))
-    output_file_l = get_destination(records_table)
-    open(output_file_l, "a") do file_l
-        Base.write(file_l, formatted_record(records_table))
-        Base.write(file_l, "\n")
+    if get_config("EXTRA_LOG")
+        println("WRITING :", formatted_record(records_table))
+        output_file_l = get_destination(records_table)
+        open(output_file_l, "a") do file_l
+            Base.write(file_l, formatted_record(records_table))
+            Base.write(file_l, "\n")
+        end
     end
 end
 
@@ -47,11 +49,13 @@ function get_record(records_table::RecordsWriter)::Vector{Any}
 end
 
 function init!(records_table::RecordsWriter, dir_p, filename_p, append=false)
-    mkpath(dir_p)
-    set_destination!(records_table, joinpath(dir_p, filename_p))
-    clean_record!(records_table)
-    if (filesize(get_destination(records_table)) == 0) || !append
-        write_header(records_table)
+    if get_config("EXTRA_LOG")
+        mkpath(dir_p)
+        set_destination!(records_table, joinpath(dir_p, filename_p))
+        clean_record!(records_table)
+        if (filesize(get_destination(records_table)) == 0) || !append
+            write_header(records_table)
+        end
     end
 end
 

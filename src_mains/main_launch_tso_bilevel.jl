@@ -44,6 +44,7 @@ function main_launch_tso_bilevel(case_p::String;
     # LOL sensibility problems
     PSCOPF.set_config!("FIX_NULL_LOL", null_lol_p)
     # LOG options
+    PSCOPF.set_config!("EXTRA_LOG", true)
     PSCOPF.set_config!("LOG_COMBINATIONS", true)
     PSCOPF.set_config!("LOG_NB_CSTRS_FILENAME", joinpath(@__DIR__, "..", "main_nbCSTRS.log"))
     PSCOPF.set_config!("TEMP_GLOBAL_LOGFILE", joinpath(@__DIR__, "..", "main_timingsRSO.log"))

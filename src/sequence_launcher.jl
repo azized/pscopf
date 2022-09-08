@@ -167,8 +167,10 @@ function run!(context_p::AbstractContext, sequence_p::Sequence;
                 check_context=true)
     init!(context_p, sequence_p, check_context)
     summarize_instance(context_p)
-    init!(DYNAMIC_SOLVE_RECORDS, context_p.out_dir, "dynamicSolve.log", false)
-    init!(TSO_SOLVE_RECORDS, ".", "tsoSolve.log", true)
+    if get_config("EXTRA_LOG")
+        init!(DYNAMIC_SOLVE_RECORDS, context_p.out_dir, "dynamicSolve.log", false)
+        init!(TSO_SOLVE_RECORDS, ".", "tsoSolve.log", true)
+    end
 
     for (steps_index, (ech, steps_at_ech)) in enumerate(get_operations(sequence_p))
         @info("-"^50)

@@ -21,6 +21,8 @@ const DEFAULT_CONFIGS = (
     CONSIDER_N_1 = true,
 
     PSCOPF_TIME_LIMIT_IN_SECONDS = nothing,
+
+    EXTRA_LOG = false,
     PSCOPF_REDIRECT_LOG = true,
     LP_FILES = false,
 
