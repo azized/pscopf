@@ -25,6 +25,7 @@ module PSCOPF
 
     include("checkers.jl")
 
+    include("steps/records.jl")
     include("steps/common.jl")
     include("steps/solve.jl")
     include("steps/defs.jl")

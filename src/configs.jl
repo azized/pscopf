@@ -13,13 +13,18 @@ const DEFAULT_CONFIGS = (
     lol_eps = 1e-04,
     FIX_NULL_LOL = false,
 
-    MAX_ADD_RSO_CSTR_PER_ITER = nothing,
+    VIOLATIONS_ADD_FUNCTION = "TS",
+    MAX_ADD_RSO_CSTR_PER_ITER = 1,
     ADD_RSO_CSTR_DYNAMICALLY = false,
+    DYNAMIC_ONLY_STEP1 = false,
+    #if false, only BASECASE ptdf entries will be read and Runnables will not be able to consider N-1 constraints even if consider_N_1 is set to true in the runnable's config
     CONSIDER_N_1 = true,
 
     PSCOPF_TIME_LIMIT_IN_SECONDS = nothing,
+
+    EXTRA_LOG = false,
     PSCOPF_REDIRECT_LOG = true,
-    SOLVER_LP_FILES = false,
+    LP_FILES = false,
 
     CNT_ACTIVE_RSO_CSTRS = false,
     LOG_COMBINATIONS = false,

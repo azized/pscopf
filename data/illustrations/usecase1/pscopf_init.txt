@@ -1,0 +1,3 @@
+#                    name     state
+                    fuel_A        OFF
+                    fuel_B        OFF

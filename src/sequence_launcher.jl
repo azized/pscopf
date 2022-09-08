@@ -99,7 +99,9 @@ function run_step!(context_p::AbstractContext, step::AbstractRunnable, ech, next
     @timeit TIMER_TRACKS "run_model" result = run(step, ech, firmness,
                                                 get_target_timepoints(context_p),
                                                 context_p)
-    log_nb_rso_cstrs(get_config("LOG_NB_CSTRS_FILENAME"), result, context_p.out_dir, ech)
+    log_nb_rso_cstrs(get_config("LOG_NB_CSTRS_FILENAME"), result,
+                    theoretical_nb_combinations(get_network(context_p), get_target_timepoints(context_p), get_scenarios(context_p)),
+                    context_p.out_dir, ech)
 
     if affects_market_schedule(step)
     @timeit TIMER_TRACKS "update_schedules" begin
@@ -164,6 +166,11 @@ end
 function run!(context_p::AbstractContext, sequence_p::Sequence;
                 check_context=true)
     init!(context_p, sequence_p, check_context)
+    summarize_instance(context_p)
+    if get_config("EXTRA_LOG")
+        init!(DYNAMIC_SOLVE_RECORDS, context_p.out_dir, "dynamicSolve.log", false)
+        init!(TSO_SOLVE_RECORDS, ".", "tsoSolve.log", true)
+    end
 
     for (steps_index, (ech, steps_at_ech)) in enumerate(get_operations(sequence_p))
         @info("-"^50)
@@ -183,6 +190,8 @@ function run!(context_p::AbstractContext, sequence_p::Sequence;
 
         end
     end
+
+    @info PSCOPF.TIMER_TRACKS
 end
 
 
@@ -223,7 +232,7 @@ function trace_firmness(firmness::Firmness)
         if !isempty(TS_to_decide_for)
             msg = @sprintf("TO_DECIDE commitment (Firm) :  %s for %s",
                             gen_id, TS_to_decide_for)
-            @info msg
+            @debug msg
         end
     end
 
@@ -237,7 +246,7 @@ function trace_firmness(firmness::Firmness)
         if !isempty(TS_to_decide_for)
             msg = @sprintf("TO_DECIDE production level (Firm) :  %s for %s",
                             gen_id, TS_to_decide_for)
-            @info msg
+            @debug msg
         end
     end
 end
@@ -341,14 +350,14 @@ function trace_impositions(tso_actions)
     end
 end
 
-function log_nb_rso_cstrs(::Any, ::Union{Nothing,AbstractModelContainer}, ::Any, ::Any)
+function log_nb_rso_cstrs(::Any, ::Union{Nothing,AbstractModelContainer}, ::Any, ::Any, ::Any)
 end
 function log_nb_rso_cstrs(logfile::String,
                         result::Union{TSOModel, TSOBilevel, TSOBilevelModel, TSOBilevelTSOModelContainer},
+                        nb_possible_combinations::Int,
                         outdir::String, ech::DateTime)
     #TODO : avoid hardcode
-    index = findfirst("pscopf", lowercase(outdir))
-    usecase_name = outdir[(isnothing(index) ? 1 : first(index)) : end]
+    usecase_name = substring_from(outdir, "pscopf")
     if filesize(logfile) == 0
         open(logfile, "w") do file_l
             Base.write(file_l, "#usecase dynamic? model ech status added_rso_cstrs total_rso_cstrs ratio_cstrs LoL\n")
@@ -356,10 +365,9 @@ function log_nb_rso_cstrs(logfile::String,
     end
     open(logfile, "a") do file_l
         considered = length(get_rso_constraints(result))
-        possible = length(get_rso_combinations(result))
         Base.write(file_l, @sprintf("%s %s %s %s %s %d %d %.3f %s\n",
                                 usecase_name, get_config("ADD_RSO_CSTR_DYNAMICALLY"), typeof(result), ech, get_status(result),
-                                considered, possible, considered/possible, total_lol(result) ))
+                                considered, nb_possible_combinations, considered/nb_possible_combinations, total_lol(result) ))
     end
 
     if get_config("LOG_COMBINATIONS")
@@ -370,4 +378,16 @@ function log_nb_rso_cstrs(logfile::String,
             end
         end
     end
+end
+
+
+function summarize_instance(context_p::PSCOPFContext)
+    network = get_network(context_p)
+    @info @sprintf("launching on network %s", get_id(network))
+    @info @sprintf("network contains %d buses and %d branches", get_nb_buses(network), get_nb_branches(network))
+    @info @sprintf("%d network cases will be considered", get_nb_network_cases(network))
+    TS = get_target_timepoints(context_p)
+    @info @sprintf("for %d timepoints : %s", length(TS), TS)
+    S = get_scenarios(context_p)
+    @info @sprintf("for %d scenarios : %s", length(S), S)
 end

@@ -25,7 +25,7 @@ export
     ## branch
     add_new_branch!, add_new_branches!, add_branch!, add_branches!,
     add_new_limit!,
-    get_branch, safeget_branch, get_branches,
+    get_branch, safeget_branch, get_branches, get_nb_branches,
     get_limit, safeget_limit,
     ## load and generator
     add_new_generator_to_bus!,
@@ -35,7 +35,7 @@ export
     ## ptdf
     add_ptdf_elt!,
     get_ptdf_component, safeget_ptdf_component,
-    get_ptdf, safeget_ptdf,
+    get_ptdf, safeget_ptdf, get_nb_network_cases,
     ## utils
     get_id,
     safeget_generator_or_bus, get_generator_or_bus,

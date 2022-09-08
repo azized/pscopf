@@ -131,8 +131,6 @@ end
     lol_model::TSOBilevelTSOLoLModel = TSOBilevelTSOLoLModel()
     objective_model::TSOBilevelTSOObjectiveModel = TSOBilevelTSOObjectiveModel()
     #branch,ts,s,ptdf_case
-    rso_combinations::Vector{Tuple{String,DateTime,String,String}} =
-        Vector{Tuple{String,DateTime,String,String}}()
     flows::SortedDict{Tuple{String,DateTime,String,String},AffExpr} =
         SortedDict{Tuple{String,DateTime,String,String},AffExpr}()
     rso_constraints::SortedDict{Tuple{String,DateTime,String,String},Tuple{ConstraintRef,ConstraintRef}} =
@@ -260,9 +258,6 @@ function get_lower_obj_expr(bilevel_model::TSOBilevelModel)
     return bilevel_model.lower.objective_model.full_obj
 end
 
-function get_rso_combinations(model_container::TSOBilevelModel)
-    return get_rso_combinations(model_container.upper)
-end
 function get_flows(model_container::TSOBilevelModel)
     return get_flows(model_container.upper)
 end
@@ -375,10 +370,7 @@ function add_tso_constraints!(bimodel_container::TSOBilevelModel,
                             buses_ids_l, target_timepoints, scenarios,
                             cstr_prefix_name="tso_distribute_lol")
 
-    #just adds the combinations to consider not the constraints
-    add_rso_combinations!(get_rso_combinations(bimodel_container),
-                        configs.CONSIDER_N_1_CSTRS,
-                        network, target_timepoints, scenarios)
+    # RSO constraints are missing
 
     return bimodel_container
 end
@@ -966,6 +958,7 @@ function create_tso_bilevel_model(network::Networks.Network,
 
     bimodel_container_l = TSOBilevelModel()
 
+    @debug "create vars"
     create_tso_vars!(bimodel_container_l.upper,
                     network, target_timepoints, scenarios,
                     preceding_market_schedule)
@@ -977,6 +970,7 @@ function create_tso_bilevel_model(network::Networks.Network,
     create_market_objectives!(bimodel_container_l.lower, network,
                             configs.MARKET_CAPPING_COST, configs.MARKET_LOL_PENALTY)
 
+    @debug "create constraints (apart from RSO constraints)"
     #constraints may use upper and lower vars at the same time
     add_tso_constraints!(bimodel_container_l, target_timepoints, scenarios, network,
                         firmness, reference_schedule, generators_initial_state,
@@ -1031,11 +1025,14 @@ function tso_bilevel(network::Networks.Network,
                                                                         preceding_market_schedule, preceding_tso_schedule,
                                                                         configs)
 
+    @debug "called tso solve : build RSO constraints and launch solver"
     tso_solve!(bimodel_container_l,
                 launch_solve!, configs,
                 uncertainties_at_ech, network,
                 get_config("ADD_RSO_CSTR_DYNAMICALLY"))
-    @timeit TIMER_TRACKS "flows.log" log_flows(bimodel_container_l.upper, network, configs.out_path, configs.problem_name)
+    @timeit TIMER_TRACKS "flows.log" log_flows(bimodel_container_l.upper, network,
+                                                theoretical_nb_combinations(network, target_timepoints, scenarios),
+                                                configs.out_path, configs.problem_name)
 
     return bimodel_container_l
 end
@@ -1044,7 +1041,11 @@ function launch_solve!(bimodel_container::TSOBilevelModel, configs::TSOBilevelCo
 
     #the upper problem's objective model holds the two objective expressions and the deltas expression
     if configs.CONSIDER_DELTAS
-        solve_2steps_deltas!(bimodel_container, configs)
+        if get_config("DYNAMIC_ONLY_STEP1")
+            solve_step1!(bimodel_container, configs)
+        else
+            solve_2steps_deltas!(bimodel_container, configs)
+        end
     else
         obj = get_objective_model(bimodel_container).full_obj_2 #upper tso model, step2 objective
         @objective(get_model(bimodel_container), Min, obj)

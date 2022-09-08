@@ -179,21 +179,24 @@ function solve!(model::AbstractModel,
 
     if !isnothing(out_folder)
         mkpath(out_folder)
-        model_file_l = joinpath(out_folder, problem_name_l*".lp")
-        write_to_file(model, model_file_l)
+        if get_config("LP_FILES")
+            @timeit TIMER_TRACKS "write_lp" begin
 
-        if get_config("SOLVER_LP_FILES")
+                model_file_l = joinpath(out_folder, problem_name_l*".lp")
+                write_to_file(model, model_file_l)
 
-            model_file_l_new = joinpath(out_folder, problem_name_l*"_new.lp")
+                model_file_l_new = joinpath(out_folder, problem_name_l*"_new.lp")
 
-            MOI.Utilities.attach_optimizer(model)
-            internalModel = unsafe_backend(model)
-            if OPTIMIZER_NAME == "Xpress"
-                Xpress.writeprob(internalModel.inner, model_file_l_new, "-l");
-            elseif OPTIMIZER_NAME == "CPLEX"
-                CPLEX.CPXwriteprob(internalModel.env, internalModel.lp, model_file_l_new, "lp")
+                MOI.Utilities.attach_optimizer(model)
+                internalModel = unsafe_backend(model)
+                if OPTIMIZER_NAME == "Xpress"
+                    Xpress.writeprob(internalModel.inner, model_file_l_new, "-l");
+                elseif OPTIMIZER_NAME == "CPLEX"
+                    CPLEX.CPXwriteprob(internalModel.env, internalModel.lp, model_file_l_new, "lp")
+                end
+
+                @info "LP files written."
             end
-
         end
 
         log_file_l = joinpath(out_folder, problem_name_l*".log")
@@ -1265,14 +1268,6 @@ end
 ##################
 
 
-"""
-    returns the RSO combinations (i.e. branch,ts,s,network_case) to be considered
-# Note
-    Not all combinations have corresponding constraints and flows in the model_container!
-"""
-function get_rso_combinations(model_container::AbstractModelContainer)
-    return model_container.rso_combinations
-end
 function get_flows(model_container::AbstractModelContainer)
     return model_container.flows
 end
@@ -1280,18 +1275,8 @@ function get_rso_constraints(model_container::AbstractModelContainer)
     return model_container.rso_constraints
 end
 
-function add_rso_combinations!(rso_combinations::Vector{Tuple{String,Dates.DateTime,String,String}},
-                            consider_all,
-                            network, target_timepoints, scenarios)
-    if consider_all
-        append!(rso_combinations, all_combinations(network, target_timepoints, scenarios))
-    else
-        append!(rso_combinations, basecase_combinations(network, target_timepoints, scenarios))
-    end
-end
-
 function add_rso_flows_exprs!(model_container::AbstractModelContainer,
-                combinations_to_add, #container of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
+                combinations_to_add, #container/Generator of Tuple{Networks.Branch,ts::DateTime,s::String,ptdfcase::String}
                 uncertainties_at_ech, network::Networks.Network)
     for (branch_id, ts, s, ptdf_case) in combinations_to_add
         branch::Networks.Branch = Networks.safeget_branch(network, branch_id)
@@ -1382,24 +1367,88 @@ function add_rso_constraint!(model::AbstractModel,
                                                     @constraint(model, flow_expr_l <= flow_limit_l , base_name=c_name_ub))
 end
 
+function flow_val(model_container::AbstractModelContainer,
+                branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
+                uncertainties_at_ech, network::Networks.Network)::Float64
+    branch_id = Networks.get_id(branch)
+
+    flow_l = 0.
+    for bus in Networks.get_buses(network)
+        bus_id = Networks.get_id(bus)
+        ptdf = Networks.safeget_ptdf_elt(network, branch_id, bus_id, ptdf_case)
+
+        # + injections limitables
+        for gen in Networks.get_generators_of_type(bus, Networks.LIMITABLE)
+            gen_id = Networks.get_id(gen)
+            val_p_injected = value(get_p_injected(model_container, Networks.LIMITABLE)[gen_id, ts, s])
+            flow_l += (ptdf*val_p_injected)
+        end
+
+        # + injections pilotables
+        for gen in Networks.get_generators_of_type(bus, Networks.PILOTABLE)
+            gen_id = Networks.get_id(gen)
+            val_p_injected = value(get_p_injected(model_container, Networks.PILOTABLE)[gen_id, ts, s])
+            flow_l += (ptdf*val_p_injected)
+        end
+
+        # - loads
+        flow_l -= (ptdf * get_uncertainties(uncertainties_at_ech, bus_id, ts, s))
+
+        # + cutting loads ~ injections
+        flow_l += (ptdf * value(get_local_lol(model_container)[bus_id, ts, s]))
+
+    end
+
+    return flow_l
+end
+
+function flow_val(branch::Networks.Branch, ts::DateTime, s::String, ptdf_case::String,
+                uncertainties_at_ech, network::Networks.Network,
+                p_values_lim, p_values_pil, p_values_lol, ptdf_p)::Float64
+    branch_id = Networks.get_id(branch)
+
+    flow_l = 0.
+    for bus in Networks.get_buses(network)
+        bus_id = Networks.get_id(bus)
+        ptdf = ptdf_p[ptdf_case, branch_id, bus_id]
+
+        # + injections limitables
+        for gen in Networks.get_generators_of_type(bus, Networks.LIMITABLE)
+            gen_id = Networks.get_id(gen)
+            flow_l += ptdf * p_values_lim[(gen_id, ts, s)]
+        end
+
+        # + injections pilotables
+        for gen in Networks.get_generators_of_type(bus, Networks.PILOTABLE)
+            gen_id = Networks.get_id(gen)
+            flow_l +=  ptdf * p_values_pil[(gen_id, ts, s)]
+        end
+
+        # - loads
+        flow_l -= ptdf * get_uncertainties(uncertainties_at_ech, bus_id, ts, s)
+
+        # + cutting loads ~ injections
+        flow_l += ptdf * p_values_lol[(bus_id, ts, s)]
+
+    end
+
+    return flow_l
+end
+
 # Helpers
 ##################
 
-function basecase_combinations(network, target_timepoints, scenarios)
-    return [(branch_id,ts,s,Networks.BASECASE)
-                for branch_id in map(Networks.get_id, Networks.get_branches(network))
-                for ts in target_timepoints
-                for s in scenarios
-            ]
-end
-
-function all_combinations(network, target_timepoints, scenarios)
-    return [(branch_id,ts,s,case)
-                for branch_id in map(Networks.get_id, Networks.get_branches(network))
+function available_combinations(network, target_timepoints, scenarios)
+    return ((branch_id,ts,s,case)
+                for branch_id in keys(network.branches)
                 for ts in target_timepoints
                 for s in scenarios
                 for case in Networks.get_cases(network) #if the network does not hold the PTDF data for a case it will be ignored
-            ]
+            )
+end
+
+function theoretical_nb_combinations(network, target_timepoints, scenarios)
+    return length(Networks.get_branches(network)) * length(target_timepoints) * length(scenarios) * length(Networks.get_cases(network))
 end
 
 """
@@ -1407,7 +1456,7 @@ end
     The number of active constraints is not exact since, in a MIP context,
      some constraints that have non-negative slack might be influential/active
 """
-function log_flows(model_container,network,out_folder,filename)
+function log_flows(model_container,network,nb_potential_cstrs,out_folder,filename)
     filename_l = valid_filename(filename)
     flows::SortedDict{Tuple{String,Dates.DateTime,String,String}, AffExpr} = get_flows(model_container)
     if !isnothing(out_folder)
@@ -1431,7 +1480,6 @@ function log_flows(model_container,network,out_folder,filename)
     if get_config("CNT_ACTIVE_RSO_CSTRS")
         @warn "This section is time consuming deactivate it with : set_config!(\"CNT_ACTIVE_RSO_CSTRS\", false)"
 
-        nb_potential_cstrs = length(get_rso_combinations(model_container)) # lb <= flow <= ub counts as one constraint
         nb_active_cstrs = 0
         for (_, (cstr_lb,cstr_ub)) in get_rso_constraints(model_container)
             if !has_slack(cstr_lb) || !has_slack(cstr_ub)

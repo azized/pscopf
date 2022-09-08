@@ -33,6 +33,7 @@ function init_logging(filepath_p)
     end
 
     log_file = endswith(filepath_p, ".log") ? filepath_p : filepath_p * ".log"
+    mkpath(dirname(log_file))
     file_logger = Logging.ConsoleLogger(open(log_file, "w"), Logging.Debug, meta_formatter=logger_metafmt)
     #file_logger = LoggingExtras.MinLevelLogger(LoggingExtras.FileLogger(log_file), Logging.Debug) #print souce_info at each log line
     logger = LoggingExtras.TeeLogger(Logging.current_logger(), file_logger)
@@ -160,4 +161,14 @@ produce a filename compatible with windows platform (win does not accept ":" in 
 """
 function valid_filename(filename_p::String)
     return replace(filename_p, ":"=>"_")
+end
+
+
+"""
+if pattern occurs in str, returns the str[first occurence of pattern :end]
+else returns str
+"""
+function substring_from(str, pattern)
+    index = findfirst(pattern, str)
+    return str[(isnothing(index) ? 1 : first(index)) : end]
 end

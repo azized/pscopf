@@ -107,10 +107,12 @@ function read_ptdf!(network::Network, data::String, filename="pscopf_ptdf.txt")
             if ln[1] != '#'
                 buffer = PSCOPF.split_with_space(ln);
                 ptdf_case = buffer[1]
-                branch_id = buffer[2]
-                bus_id = buffer[3]
-                ptdf_value = parse(Float64, buffer[4])
-                Networks.add_ptdf_elt!(network, branch_id, bus_id, ptdf_value, ptdf_case)
+                if (PSCOPF.get_config("CONSIDER_N_1") || ptdf_case==Networks.BASECASE)
+                    branch_id = buffer[2]
+                    bus_id = buffer[3]
+                    ptdf_value = parse(Float64, buffer[4])
+                    Networks.add_ptdf_elt!(network, branch_id, bus_id, ptdf_value, ptdf_case)
+                end
             end
         end
     end
