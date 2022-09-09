@@ -1,0 +1,4 @@
+# id       min_p  max_p    mu     sigma       time_factor
+wind_2     0      70       50     10           1.
+poste_1_0  0      100      50.0   8           1.
+poste_2_0  0      300      300.   10          1.

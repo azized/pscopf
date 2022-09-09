@@ -1,4 +1,4 @@
 #bus_name bus_num cc
-A 1 0
-B 2 0
-D 3 0
+1 1 0
+2 2 0
+3 3 0

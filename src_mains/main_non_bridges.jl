@@ -127,8 +127,8 @@ end
 #########################
 # MAIN
 #########################
-function main(dir_names)
-    for input_dirname in dir_names
+function main(matpower_cases)
+    for input_dirname in matpower_cases
         @info input_dirname
         input_path = joinpath(@__DIR__, "..", "data_matpower", input_dirname)
         compute_non_bridges(input_path);
@@ -137,7 +137,8 @@ end
 
 
 # MATPOWER_NETWORKS = ["case14"]
-main(MATPOWER_NETWORKS)
+CASES = length(ARGS) > 0 ? [ARGS[1]] : MATPOWER_NETWORKS
+main(CASES)
 
 # input_path = joinpath(@__DIR__, "..", "data", "ptdf", "3buses_3branches")
 # compute_non_bridges(input_path);

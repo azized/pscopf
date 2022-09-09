@@ -34,7 +34,7 @@ function run(runnable::EnergyMarketAtFO,
     fo_start_time = TS[1] - get_fo_length(get_management_mode(context))
     if fo_start_time != ech
         msg = @sprintf("invalid step at ech=%s : EnergyMarketAtFO needs to be launched at FO start (ie %s)", ech, fo_start_time)
-        throw( error(msg) )
+        @warn(msg)
     end
 
     problem_name_l = @sprintf("energy_market_at_FO_%s", ech)
