@@ -36,16 +36,17 @@ include(joinpath(root_path, "src", "PSCOPF.jl"));
 # pscopf_limits : the flow capacity of each branch
 # pscopf_ptdf : the ptdf coefficients per (branch, bus_id)
 # pscopf_init : the description of the initial state of units (just before the first interest timepoit T)
-data_path = joinpath(@__DIR__, "..", "usecases-euro-simple", "usecase2-tunnel-puissance", "data")
+usecase_name = length(ARGS) > 0 ? ARGS[1] : "usecase_demo"
+data_path = joinpath(@__DIR__, "..", "data", usecase_name)
 
 # out_path is the path where uncertainties file will be written:
 # pscopf_uncertainties : the randomly generated nodal injections
 out_path = joinpath(data_path,
-                    #"generate_uncertainties"
+                    "instance"
                     )
 
 # If true network and generator initial state files will be written to the out_path
-copy_data_files = false
+copy_data_files = true
 
 # Number of scenarios to be generated
 nb_scenarios = 2

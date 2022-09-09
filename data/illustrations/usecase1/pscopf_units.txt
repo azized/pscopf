@@ -1,3 +1,0 @@
-#                    name            type                   bus_id  minP  maxP  start  prop    dmo(s)           dp(s)
-                   fuel_A       Pilotable                        A  40    100   200    20      9.00000000E+02  9.00000000E+02
-                   fuel_B       Pilotable                        B  20    100   400    18      9.00000000E+02  9.00000000E+02

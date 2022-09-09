@@ -32,7 +32,7 @@ instance_path = ( length(ARGS) > 0 ? ARGS[1] :
 
 # output_path is the path where output files will be write_commitment_schedule
 #NOTE: all files in output_path, except those starting with pscopf_, will be deleted
-output_path = length(ARGS) > 1 ? ARGS[2] : instance_path
+output_path = length(ARGS) > 1 ? ARGS[2] : joinpath(instance_path, "mode1")
 
 
 

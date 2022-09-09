@@ -1,3 +1,0 @@
-#            network_case     branch   limit
-              BASECASE          AD     60
-              BASECASE          DB     100

@@ -79,7 +79,7 @@ end
 # INPUT & PARAMS
 #########################
 
-# input_path = ( length(ARGS) > 0 ? ARGS[1] : joinpath(@__DIR__, "..", "data_matpower", "case1354pegase") )
-for input_path in MATPOWER_NETWORKS
+IN = length(ARGS) > 0 ? [ARGS[1]] : MATPOWER_NETWORKS
+for input_path in IN
     compute_ptdf(joinpath(@__DIR__, "..", "data_matpower", input_path));
 end

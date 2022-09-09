@@ -57,16 +57,6 @@ MATPOWER_NETWORKS = [
 ];
 
 #########################
-# INPUT & PARAMS
-#########################
-
-input_path = ( length(ARGS) > 0 ? ARGS[1] :
-                    joinpath(@__DIR__, "..", "data", "ptdf", "3buses_3branches") )
-ref_bus_num = 1
-distributed = true
-eps_diag = 1e-3
-
-#########################
 # EXECUTION
 #########################
 function main(input_path, ref_bus_num, distributed, eps_diag)
@@ -75,9 +65,14 @@ function main(input_path, ref_bus_num, distributed, eps_diag)
     PTDF.compute_and_write_n_non_bridges(network, ref_bus_num, distributed, eps_diag, input_path, out_path)
 end
 
-# main(input_path, ref_bus_num, distributed, eps_diag)
+input_path = ( length(ARGS) > 0 ? ARGS[1] :
+                    joinpath(@__DIR__, "..", "data", "ptdf", "3buses_3branches") )
+ref_bus_num = 1
+distributed = true
+eps_diag = 1e-3
 
-for matpower_case in MATPOWER_NETWORKS
+IN = length(ARGS) > 0 ? [ARGS[1]] : MATPOWER_NETWORKS
+for matpower_case in IN
     @info matpower_case
     matpower_path = joinpath(@__DIR__, "..", "data_matpower", matpower_case)
     main(matpower_path, ref_bus_num, distributed, eps_diag)
